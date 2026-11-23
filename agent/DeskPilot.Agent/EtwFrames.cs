@@ -28,6 +28,7 @@ public static unsafe class EtwFrames
     const byte InformationLevel = 4;
     const uint StopControl = 1;
     const ulong InvalidTrace = ulong.MaxValue;
+    const uint Cancelled = 1223;
 
     // Only one session per DeskPilot, and the Windows callback is static, so it finds the counter here.
     static FrameCounter? counter;
@@ -42,8 +43,11 @@ public static unsafe class EtwFrames
     public static bool LayoutIsRight =>
         !Environment.Is64BitProcess || (sizeof(TraceProperties) == 120 && sizeof(TraceLogFile) == 448);
 
-    /// <summary>Starts listening and feeds frames to <paramref name="frames"/>. Returns 0, or the Windows error code.</summary>
-    public static uint Start(string name, FrameCounter frames)
+    /// <summary>
+    /// Starts listening and feeds frames to <paramref name="frames"/>. Returns 0, or the Windows error code.
+    /// Problems after the start, like a frame source Windows refuses, go to <paramref name="report"/>.
+    /// </summary>
+    public static uint Start(string name, FrameCounter frames, Action<string> report)
     {
         Stop(name); // a session left behind if DeskPilot crashed
         var size = sizeof(TraceProperties) + 1024;
@@ -71,9 +75,9 @@ public static unsafe class EtwFrames
             NativeMemory.Free(properties);
         }
 
-        Enable(session, DxgiProvider, ulong.MaxValue);
-        Enable(session, D3D9Provider, ulong.MaxValue);
-        Enable(session, KernelProvider, KernelPresentKeyword);
+        Enable(session, DxgiProvider, ulong.MaxValue, "DirectX", report);
+        Enable(session, D3D9Provider, ulong.MaxValue, "Direct3D 9", report);
+        Enable(session, KernelProvider, KernelPresentKeyword, "graphics kernel", report);
 
         counter = frames;
         namePointer = Marshal.StringToHGlobalUni(name);
@@ -95,8 +99,12 @@ public static unsafe class EtwFrames
         new Thread(() =>
         {
             var traceHandle = handle;
-            ProcessTrace(&traceHandle, 1, 0, 0);
+            var ended = ProcessTrace(&traceHandle, 1, 0, 0);
             listening = false;
+            if (ended is not 0 and not Cancelled)
+            {
+                report($"FPS: Windows stopped sending frame events (error {ended}). DeskPilot tries again in a minute.");
+            }
         })
         {
             IsBackground = true,
@@ -127,8 +135,14 @@ public static unsafe class EtwFrames
         listening = false;
     }
 
-    static void Enable(ulong session, Guid provider, ulong keywords) =>
-        EnableTraceEx2(session, &provider, EnableProvider, InformationLevel, keywords, 0, 0, 0);
+    static void Enable(ulong session, Guid provider, ulong keywords, string source, Action<string> report)
+    {
+        var result = EnableTraceEx2(session, &provider, EnableProvider, InformationLevel, keywords, 0, 0, 0);
+        if (result != 0)
+        {
+            report($"FPS: Windows refused frame events from {source} (error {result}).");
+        }
+    }
 
     [UnmanagedCallersOnly]
     static void OnEvent(byte* record)

@@ -53,6 +53,19 @@ public class FrameCounterTests
 
     [Fact]
     public void AnAppThatNeverDrewHasNoFps() => Assert.Null(new FrameCounter().Fps(42));
+
+    [Fact]
+    public void ListsEveryAppThatIsDrawing()
+    {
+        var counter = new FrameCounter();
+        Draw(counter, 42, FrameSource.DirectX, 300, 144);
+        Draw(counter, 7, FrameSource.Kernel, 300, 144);
+
+        var all = counter.AllFps();
+
+        Assert.Equal(new[] { 7, 42 }, all.Keys.Order());
+        Assert.InRange(all[42], 143, 145);
+    }
 }
 
 public class WindowsFpsTests
@@ -78,6 +91,14 @@ public class WindowsFpsTests
         {
             Assert.Empty(hints);
         }
+    }
+
+    [Fact]
+    public void TheFpsCheckSaysWhatItSees()
+    {
+        using var fps = new WindowsFps(_ => { });
+
+        Assert.False(string.IsNullOrWhiteSpace(fps.Describe()));
     }
 
     [Fact]

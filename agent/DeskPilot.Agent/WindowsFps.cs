@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace DeskPilot.Agent;
@@ -29,12 +30,31 @@ public sealed class WindowsFps(Action<string> hint) : IDisposable
             return null;
         }
         EnsureListening();
-        var window = GetForegroundWindow();
-        if (window == 0 || GetWindowThreadProcessId(window, out var process) == 0)
+        return ForegroundProcess() is { } process ? counter.Fps(process) : null;
+    }
+
+    /// <summary>What FPS sees right now: the app in front and every app drawing. For the fps command.</summary>
+    public string Describe()
+    {
+        if (!OperatingSystem.IsWindows())
         {
-            return null;
+            return "FPS works on Windows only.";
         }
-        return counter.Fps((int)process);
+        EnsureListening();
+        if (!started || !EtwFrames.IsListening)
+        {
+            return $"FPS: not listening for frames. {lastHint}";
+        }
+        var front = ForegroundProcess();
+        var inFront = front is { } process
+            ? $"{Name(process)}, {counter.Fps(process)?.ToString("0") ?? "no frames"}"
+            : "nothing";
+        var drawing = counter.AllFps()
+            .OrderByDescending(app => app.Value)
+            .Take(6)
+            .Select(app => $"{Name(app.Key)} {app.Value:0}")
+            .ToArray();
+        return $"FPS: app in front: {inFront}. Apps drawing: {(drawing.Length == 0 ? "none" : string.Join(", ", drawing))}.";
     }
 
     public void Dispose()
@@ -58,12 +78,30 @@ public sealed class WindowsFps(Action<string> hint) : IDisposable
                 return;
             }
             nextTry = DateTime.UtcNow + RetryAfter;
-            var error = EtwFrames.Start(sessionName, counter);
+            var error = EtwFrames.Start(sessionName, counter, Hint);
             started = error == 0;
-            if (!started)
-            {
-                Hint(error == EtwFrames.AccessDenied ? AccessHint : $"FPS could not start: Windows error {error}.");
-            }
+            Hint(started
+                ? "FPS: listening for frames. Type fps here to see what it measures."
+                : error == EtwFrames.AccessDenied ? AccessHint : $"FPS could not start: Windows error {error}.");
+        }
+    }
+
+    static int? ForegroundProcess()
+    {
+        var window = GetForegroundWindow();
+        return window != 0 && GetWindowThreadProcessId(window, out var process) != 0 ? (int)process : null;
+    }
+
+    static string Name(int process)
+    {
+        try
+        {
+            using var running = Process.GetProcessById(process);
+            return $"{running.ProcessName} ({process})";
+        }
+        catch (ArgumentException)
+        {
+            return $"process {process}";
         }
     }
 

@@ -25,6 +25,7 @@ _ = stats.RunAsync(app.Logger, app.Lifetime.ApplicationStopping);
 
 Console.WriteLine($"DeskPilot is running on {Environment.MachineName}. Paired phones: {security.Phones.Count}.");
 Console.WriteLine("Press Enter to pair a phone. Type forget and press Enter to unpair every phone. Press Ctrl+C to stop.");
+Console.WriteLine("Type fps and press Enter, then switch to your game, to see what FPS measures.");
 if (security.Phones.Count == 0)
 {
     ShowPairingQr();
@@ -38,7 +39,13 @@ void ReadCommands()
     {
         try
         {
-            if (line.Trim().Equals("forget", StringComparison.OrdinalIgnoreCase))
+            if (line.Trim().Equals("fps", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("Switch to your game now. Checking in 5 seconds...");
+                Thread.Sleep(TimeSpan.FromSeconds(5));
+                Console.WriteLine(fps.Describe());
+            }
+            else if (line.Trim().Equals("forget", StringComparison.OrdinalIgnoreCase))
             {
                 // shortcut: a phone that is connected right now stays connected until it reconnects.
                 security.Phones.ForgetAll();

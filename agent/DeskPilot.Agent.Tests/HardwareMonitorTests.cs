@@ -50,6 +50,38 @@ public class HardwareMonitorTests
         Assert.Null(monitor.CpuTemp());
         Assert.Null(monitor.CpuTemp());
 
-        Assert.Contains("LibreHardwareMonitor", Assert.Single(hints));
+        Assert.Contains("can't reach LibreHardwareMonitor", Assert.Single(hints));
+    }
+
+    [Fact]
+    public async Task SaysWhenItAnswersWithoutACpuTemperatureAndWhenItWorks()
+    {
+        var unused = new TcpListener(IPAddress.Loopback, 0);
+        unused.Start();
+        var port = ((IPEndPoint)unused.LocalEndpoint).Port;
+        unused.Stop();
+        using var server = new HttpListener();
+        server.Prefixes.Add($"http://127.0.0.1:{port}/");
+        server.Start();
+        var answers = new[] { Machine(""), Machine(Sensor("Core (Tctl/Tdie)", "/amdcpu/0/temperature/2", 61.3)) };
+        var serving = Task.Run(async () =>
+        {
+            foreach (var answer in answers)
+            {
+                var request = await server.GetContextAsync();
+                await request.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(answer));
+                request.Response.Close();
+            }
+        });
+        var hints = new List<string>();
+        using var monitor = new HardwareMonitor(hints.Add, port);
+
+        Assert.Null(monitor.CpuTemp());
+        Assert.Equal(61.3, monitor.CpuTemp());
+        await serving;
+
+        Assert.Equal(2, hints.Count);
+        Assert.Contains("shows no CPU temperature", hints[0]);
+        Assert.Contains("reading it", hints[1]);
     }
 }

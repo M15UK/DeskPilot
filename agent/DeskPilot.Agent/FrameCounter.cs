@@ -58,6 +58,19 @@ public sealed class FrameCounter
         }
     }
 
+    /// <summary>The FPS of every app that drew in the last second, by process id.</summary>
+    public IReadOnlyDictionary<int, double> AllFps()
+    {
+        lock (gate)
+        {
+            var processes = frames.Keys.Select(key => key.Process).Distinct().ToArray();
+            return processes
+                .Select(process => (process, fps: Fps(process)))
+                .Where(app => app.fps is not null)
+                .ToDictionary(app => app.process, app => app.fps!.Value);
+        }
+    }
+
     void DropOld(Queue<double> times)
     {
         while (times.Count > 0 && times.Peek() <= latest - WindowSeconds)

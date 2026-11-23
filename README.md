@@ -150,6 +150,12 @@ have:
 
 Then start DeskPilot again and add **Stat** tiles for CPU temperature and FPS.
 
+If a tile stays empty, the DeskPilot window says why. Two checks help:
+
+* Open <http://127.0.0.1:8085/data.json> in a browser on the PC. It should show a long list of sensors.
+* Type `fps` in the DeskPilot window and press Enter, then switch to your game. After 5 seconds it shows
+  the app in front and every app that is drawing frames.
+
 Until a tool is ready, its tile shows a dash and the DeskPilot window says what is missing.
 
 To run the tests, use `dotnet test agent/DeskPilot.slnx` (73 tests) and `flutter test` in the app
