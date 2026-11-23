@@ -1,0 +1,19 @@
+name: Agent
+
+on:
+  push:
+    branches: [main]
+    paths: ["agent/**", ".github/workflows/agent.yml"]
+  pull_request:
+    paths: ["agent/**", ".github/workflows/agent.yml"]
+
+jobs:
+  test:
+    # Windows is the main target, so the tests run there.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 11.0.x
+      - run: dotnet test agent/DeskPilot.slnx

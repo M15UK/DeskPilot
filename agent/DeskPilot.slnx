@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="DeskPilot.Agent.Tests/DeskPilot.Agent.Tests.csproj" />
+  <Project Path="DeskPilot.Agent/DeskPilot.Agent.csproj" />
+</Solution>

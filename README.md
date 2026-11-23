@@ -1,9 +1,11 @@
 # DeskPilot
 
 [![App](https://github.com/M15UK/DeskPilot/actions/workflows/app.yml/badge.svg)](https://github.com/M15UK/DeskPilot/actions/workflows/app.yml)
+[![PC app](https://github.com/M15UK/DeskPilot/actions/workflows/agent.yml/badge.svg)](https://github.com/M15UK/DeskPilot/actions/workflows/agent.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Status: just started, nothing works yet. Follow along in the [build plan](docs/PLAN.md).**
+**Status: step 1 of 8 is done. Your phone connects to your PC and can press Play/Pause. Follow along in
+the [build plan](docs/PLAN.md).**
 
 DeskPilot turns your phone into a control deck for your gaming PC. Tap buttons to control music,
 Discord and your games, and see live PC stats like temperature and FPS. It is made for gamers and
@@ -51,8 +53,26 @@ The details are in the [build plan](docs/PLAN.md).
 
 Flutter (one app for Android and iPhone) · C# and .NET (the PC app) · GitHub Actions
 
+## Run it on your computer
+
+You need the .NET 11 SDK for the PC app, and Flutter 3.47 with an Android phone for the phone app.
+
+```bash
+dotnet run --project agent/DeskPilot.Agent   # starts the PC app and shows its addresses
+cd app && flutter run                         # installs the phone app on your connected phone
+```
+
+Type one of the addresses the PC app shows into the phone app, then tap Connect. Your phone and PC
+need to be on the same network. The first time, Windows Firewall asks about DeskPilot. Allow it on
+private networks.
+
+To run the tests, use `dotnet test agent/DeskPilot.slnx` (10 tests) and `flutter test` in the app
+folder (5 tests).
+
 ## Limits
 
+* Play/Pause works on Windows only for now. On a Mac or Linux PC, the app tells you so.
+* There is no pairing yet, so anyone on your network could press Play/Pause. Step 2 fixes this.
 * Windows comes first. Mac and Linux get the PC app later, without the game features.
 * FPS and the Assetto Corsa dashboard will only work on Windows.
 * CPU temperature on Windows will need HWiNFO or LibreHardwareMonitor running in the background.

@@ -8,7 +8,7 @@ stats with FPS, Discord controls, and a sim racing dashboard for Assetto Corsa.
 | Topic | Choice |
 |---|---|
 | Phone app | Flutter, one codebase for Android and iPhone. Android first (that's the test phone), iPhone after |
-| PC agent | C# on .NET 10 (LTS), a tray app. Windows first, then the core features on Mac and Linux |
+| PC agent | C# on .NET 11 (supported until November 2028), a tray app. Windows first, then the core features on Mac and Linux |
 | Connection | Wi-Fi with QR pairing. USB on Android through `adb reverse`. USB on iPhone later |
 | GitHub | Public repo, MIT license |
 | Reference | [PhoneBox](https://github.com/ersinkoc/phonebox) (MIT): we borrow ideas, write our own code, and credit it in the README |
@@ -35,8 +35,7 @@ Phone app (Flutter)                                  PC agent (C# .NET, tray ico
 deskpilot/
   agent/       C# agent and its tests
   app/         Flutter phone app
-  protocol/    message format with example messages, shared by both sides
-  docs/
+  docs/        this plan, and PROTOCOL.md with the messages both sides use
 ```
 
 ## Features and how each one works
@@ -59,7 +58,7 @@ deskpilot/
 Each phase ends with something working on your phone.
 
 0. **Setup:** GitHub repo, MIT license, README, `.gitignore`, GitHub Actions that build the agent and the app.
-1. **First connection:** agent with a WebSocket server; the app connects by typing the PC's IP; one Play/Pause button
+1. **First connection (done):** agent with a WebSocket server; the app connects by typing the PC's IP; one Play/Pause button
    works. This proves the whole path end to end.
 2. **Pairing and security:** QR pairing, TLS with the pinned certificate, the key kept in the phone's secure storage,
    USB through `adb reverse`.
@@ -91,6 +90,6 @@ Each phase ends with something working on your phone.
 
 ## Setup checklist
 
-- Mac: Flutter 3.47, Xcode 16.2, Android SDK and GitHub CLI are installed. **Missing: .NET 10 SDK.**
-- Windows PC: .NET 10 SDK, Assetto Corsa, Discord desktop app, PresentMon (bundled later).
+- Mac: Flutter 3.47, Xcode 16.2, Android SDK, GitHub CLI and .NET 11 SDK are installed.
+- Windows PC: .NET 11 SDK, Assetto Corsa, Discord desktop app, PresentMon (bundled later).
 - Android phone: Developer options and USB debugging turned on, for USB and installing test builds.

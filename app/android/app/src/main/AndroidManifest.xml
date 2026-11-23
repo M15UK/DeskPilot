@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Talks to the DeskPilot agent on your PC over the local network. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="deskpilot"
+        android:label="DeskPilot"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
