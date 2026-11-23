@@ -4,14 +4,20 @@ using System.Text.Json.Serialization;
 
 namespace DeskPilot.Agent;
 
-/// <summary>PC readings sent to phones each second, in percent or °C. Null means this PC can't tell.</summary>
-public sealed record PcStats(double? CpuLoad, double? GpuLoad, double? GpuTemp, double? RamLoad)
+/// <summary>PC readings sent to phones each second: percent, °C, or frames per second. Null means this PC can't tell.</summary>
+public sealed record PcStats(
+    double? CpuLoad,
+    double? GpuLoad,
+    double? GpuTemp,
+    double? RamLoad,
+    double? CpuTemp = null,
+    double? Fps = null)
 {
     public static PcStats Unknown { get; } = new(null, null, null, null);
 
     /// <summary>The names stat tiles use, the same as the JSON property names.</summary>
     public static readonly FrozenSet<string> Names =
-        new[] { "cpuLoad", "gpuLoad", "gpuTemp", "ramLoad" }.ToFrozenSet();
+        new[] { "cpuLoad", "gpuLoad", "gpuTemp", "ramLoad", "cpuTemp", "fps" }.ToFrozenSet();
 
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {

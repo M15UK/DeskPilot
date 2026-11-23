@@ -14,7 +14,10 @@ var security = new AgentSecurity(
 var decks = new DeckStore(Path.Combine(folder, "deck.json"));
 
 using var statsReader = new StatsReader();
-var stats = new StatsFeed(statsReader.Read);
+using var hardwareMonitor = new HardwareMonitor(Console.WriteLine);
+using var fps = new PresentMonFps(Console.WriteLine);
+var stats = new StatsFeed(() =>
+    statsReader.Read() with { CpuTemp = hardwareMonitor.CpuTemp(), Fps = fps.Read() });
 
 var app = AgentServer.Create(AgentServer.DefaultPort, new AgentServices(security, decks, stats, Actions.RunAsync));
 await app.StartAsync();

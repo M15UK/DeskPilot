@@ -497,9 +497,14 @@ const statHistoryLength = 60;
 /// tell.
 String formatStat(String stat, double? value) => switch (value) {
   null => '—',
+  final value when stat == 'fps' => '${value.round()}',
   final value when stat.endsWith('Temp') => '${value.round()}°C',
   final value => '${value.round()}%',
 };
+
+/// The reading that fills a gauge or reaches the top of a chart. Percent and
+/// °C use 100.
+double statMaximum(String stat) => stat == 'fps' ? 240 : 100;
 
 class _StatTile extends StatelessWidget {
   const _StatTile({
@@ -541,8 +546,8 @@ class _StatTile extends StatelessWidget {
                       AspectRatio(
                         aspectRatio: 1,
                         child: CircularProgressIndicator(
-                          // Percent and °C both fill the ring at 100.
-                          value: ((value ?? 0) / 100).clamp(0.0, 1.0),
+                          value: ((value ?? 0) / statMaximum(action.stat))
+                              .clamp(0.0, 1.0),
                           strokeWidth: 8,
                           backgroundColor:
                               theme.colorScheme.surfaceContainerHighest,
@@ -557,6 +562,7 @@ class _StatTile extends StatelessWidget {
                         child: CustomPaint(
                           painter: _ChartPainter(
                             history,
+                            statMaximum(action.stat),
                             theme.colorScheme.primary,
                           ),
                         ),
@@ -577,12 +583,13 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-/// A line of the last minute of a reading, 0 at the bottom and 100 at the
-/// top, growing in from the right.
+/// A line of the last minute of a reading, 0 at the bottom and [maximum] at
+/// the top, growing in from the right.
 class _ChartPainter extends CustomPainter {
-  _ChartPainter(this.points, this.color);
+  _ChartPainter(this.points, this.maximum, this.color);
 
   final List<double> points;
+  final double maximum;
   final Color color;
 
   @override
@@ -592,7 +599,7 @@ class _ChartPainter extends CustomPainter {
     final line = Path();
     for (final (index, point) in points.indexed) {
       final x = size.width - (points.length - 1 - index) * step;
-      final y = size.height * (1 - (point / 100).clamp(0.0, 1.0));
+      final y = size.height * (1 - (point / maximum).clamp(0.0, 1.0));
       if (index == 0) {
         line.moveTo(x, y);
       } else {
@@ -611,5 +618,5 @@ class _ChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ChartPainter old) =>
-      old.points != points || old.color != color;
+      old.points != points || old.maximum != maximum || old.color != color;
 }

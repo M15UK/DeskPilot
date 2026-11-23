@@ -208,4 +208,13 @@ void main() {
       expect(added.style, 'number');
     });
   });
+
+  test('readings read naturally on a tile', () {
+    expect(formatStat('cpuTemp', 61.26), '61°C');
+    expect(formatStat('gpuLoad', 23.6), '24%');
+    expect(formatStat('fps', 143.6), '144');
+    expect(formatStat('fps', null), '—');
+    expect(statMaximum('fps'), 240);
+    expect(statMaximum('cpuLoad'), 100);
+  });
 }

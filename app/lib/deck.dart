@@ -16,6 +16,8 @@ const statNames = {
   'gpuLoad': 'GPU load',
   'gpuTemp': 'GPU temperature',
   'ramLoad': 'RAM used',
+  'cpuTemp': 'CPU temperature',
+  'fps': 'FPS of the game in front',
 };
 
 /// How a stat tile shows its reading.
