@@ -30,15 +30,45 @@ public sealed record StatAction(string Stat, string Style) : ButtonAction
 
 /// <summary>
 /// A button on a page. <paramref name="Icon"/> names an icon the phone app knows, and <paramref name="Color"/> is one
-/// of <see cref="Colors"/>. Left out, the phone picks both from what the button does.
+/// of <see cref="Colors"/>. Left out, the phone picks both from what the button does. <paramref name="Size"/> is one
+/// of <see cref="Sizes"/>: two places wide, two tall, or both. Left out, the button takes one place.
+/// <paramref name="Style"/> is one of <see cref="Styles"/> (left out: tinted), and <paramref name="Show"/> one of
+/// <see cref="Shows"/> (left out: icon and label).
 /// </summary>
-public sealed record DeckButton(string Id, string Label, ButtonAction Action, string? Icon = null, string? Color = null)
+public sealed record DeckButton(
+    string Id,
+    string Label,
+    ButtonAction Action,
+    string? Icon = null,
+    string? Color = null,
+    string? Size = null,
+    string? Style = null,
+    string? Show = null)
 {
+    public static readonly FrozenSet<string> Styles = new[] { "solid", "outline" }.ToFrozenSet();
+
+    public static readonly FrozenSet<string> Shows = new[] { "icon", "name" }.ToFrozenSet();
+
     public static readonly FrozenSet<string> Colors =
         new[] { "red", "amber", "green", "teal", "blue", "purple", "pink", "gray" }.ToFrozenSet();
+
+    public static readonly FrozenSet<string> Sizes = new[] { "wide", "tall", "big" }.ToFrozenSet();
 }
 
-public sealed record DeckPage(string Name, IReadOnlyList<DeckButton> Buttons);
+/// <summary>
+/// A page of buttons. <paramref name="Size"/> is one of <see cref="Sizes"/> (left out: medium). <paramref name="Icon"/>
+/// is the page's icon in the phone's page rail, and <paramref name="Background"/> one of
+/// <see cref="DeckButton.Colors"/>.
+/// </summary>
+public sealed record DeckPage(
+    string Name,
+    IReadOnlyList<DeckButton> Buttons,
+    string? Size = null,
+    string? Icon = null,
+    string? Background = null)
+{
+    public static readonly FrozenSet<string> Sizes = new[] { "small", "medium", "large", "huge" }.ToFrozenSet();
+}
 
 /// <summary>The pages of buttons every paired phone shows. The PC keeps it and checks every change.</summary>
 public sealed record Deck(IReadOnlyList<DeckPage> Pages)
@@ -75,7 +105,7 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
         new DeckButton("gpu-load", "GPU", new StatAction("gpuLoad", "gauge")),
         new DeckButton("gpu-temp", "GPU temperature", new StatAction("gpuTemp", "number")),
         new DeckButton("ram-load", "RAM", new StatAction("ramLoad", "gauge")),
-        new DeckButton("cpu-chart", "CPU last minute", new StatAction("cpuLoad", "chart")),
+        new DeckButton("cpu-chart", "CPU last minute", new StatAction("cpuLoad", "chart"), Size: "wide"),
     ]), new DeckPage("Racing",
     [
         new DeckButton("sim-gear", "Gear", new StatAction("gear", "number")),
@@ -122,6 +152,12 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
             {
                 return $"Every page needs a name of 1 to {MaxTextLength} characters.";
             }
+            if (page.Size is not null && !DeckPage.Sizes.Contains(page.Size)
+                || page.Icon is not null && !IsIconName(page.Icon)
+                || page.Background is not null && !DeckButton.Colors.Contains(page.Background))
+            {
+                return $"The page \"{page.Name}\" has a size, icon or background DeskPilot doesn't know.";
+            }
             if (page.Buttons.Count > MaxButtonsPerPage)
             {
                 return $"A page can hold up to {MaxButtonsPerPage} buttons.";
@@ -137,9 +173,12 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
                     return $"Every button needs a label of 1 to {MaxTextLength} characters.";
                 }
                 if (button.Icon is not null && !IsIconName(button.Icon)
-                    || button.Color is not null && !DeckButton.Colors.Contains(button.Color))
+                    || button.Color is not null && !DeckButton.Colors.Contains(button.Color)
+                    || button.Size is not null && !DeckButton.Sizes.Contains(button.Size)
+                    || button.Style is not null && !DeckButton.Styles.Contains(button.Style)
+                    || button.Show is not null && !DeckButton.Shows.Contains(button.Show))
                 {
-                    return $"The button \"{button.Label}\" has an icon or color DeskPilot doesn't know.";
+                    return $"The button \"{button.Label}\" has a look DeskPilot doesn't know.";
                 }
                 if (!CanRun(button.Action))
                 {

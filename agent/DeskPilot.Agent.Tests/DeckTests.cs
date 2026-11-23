@@ -51,18 +51,18 @@ public class DeckTests
             """{"pages":[{"name":"Main","buttons":[""" +
             """{"id":"previous","label":"Previous","action":{"kind":"media","media":"previous"}},""" +
             """{"id":"play-pause","label":"Play / Pause","action":{"kind":"media","media":"playPause"}},""" +
-            """{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]},"icon":"flag","color":"amber"},""" +
+            """{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]},"icon":"flag","color":"amber","show":"icon"},""" +
             """{"id":"ac","label":"Assetto Corsa","action":{"kind":"open","target":"steam://rungameid/244210"}},""" +
-            """{"id":"cpu","label":"CPU","action":{"kind":"stat","stat":"cpuLoad","style":"gauge"}}""" +
-            """]}]}""";
+            """{"id":"cpu","label":"CPU","action":{"kind":"stat","stat":"cpuLoad","style":"gauge"},"size":"wide","style":"outline"}""" +
+            """],"size":"large","icon":"home","background":"blue"}]}""";
         var deck = new Deck([new DeckPage("Main",
         [
             new DeckButton("previous", "Previous", new MediaAction("previous")),
             new DeckButton("play-pause", "Play / Pause", new MediaAction("playPause")),
-            new DeckButton("pit", "Pit", new KeysAction(["Ctrl+P", "Enter"]), Icon: "flag", Color: "amber"),
+            new DeckButton("pit", "Pit", new KeysAction(["Ctrl+P", "Enter"]), Icon: "flag", Color: "amber", Show: "icon"),
             new DeckButton("ac", "Assetto Corsa", new OpenAction("steam://rungameid/244210")),
-            new DeckButton("cpu", "CPU", new StatAction("cpuLoad", "gauge")),
-        ])]);
+            new DeckButton("cpu", "CPU", new StatAction("cpuLoad", "gauge"), Size: "wide", Style: "outline"),
+        ], Size: "large", Icon: "home", Background: "blue")]);
 
         Assert.Equal(expected, Json(deck));
     }
@@ -93,6 +93,11 @@ public class DeckTests
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"stat","stat":"cpuLoad","style":"dial"}}]}]}""")]
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},"color":"rainbow"}]}]}""")]
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},"icon":"../../x"}]}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},"size":"1x9"}]}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[],"size":"gigantic"}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[],"background":"plaid"}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},"style":"glitter"}]}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},"show":"nothing"}]}]}""")]
     [InlineData("""["not","a","deck"]""")]
     public void BadDecksAreRefused(string json)
     {

@@ -107,6 +107,8 @@ final class StatAction extends ButtonAction {
 
 /// A button on a page. [icon] names one of the app's icons and [color] one of
 /// its colors; left null, the app picks both from what the button does.
+/// [size] is one of [buttonSizes], [style] one of [buttonStyles] and [show]
+/// one of [buttonShows]; null means the first choice in each.
 class DeckButton {
   const DeckButton({
     required this.id,
@@ -114,6 +116,9 @@ class DeckButton {
     required this.action,
     this.icon,
     this.color,
+    this.size,
+    this.style,
+    this.show,
   });
 
   final String id;
@@ -121,6 +126,9 @@ class DeckButton {
   final ButtonAction action;
   final String? icon;
   final String? color;
+  final String? size;
+  final String? style;
+  final String? show;
 
   Map<String, Object> toJson() => {
     'id': id,
@@ -128,6 +136,9 @@ class DeckButton {
     'action': action.toJson(),
     'icon': ?icon,
     'color': ?color,
+    'size': ?size,
+    'style': ?style,
+    'show': ?show,
   };
 
   static DeckButton? fromJson(Object? json) {
@@ -143,14 +154,11 @@ class DeckButton {
           id: id,
           label: label,
           action: read,
-          icon: switch (map['icon']) {
-            final String icon => icon,
-            _ => null,
-          },
-          color: switch (map['color']) {
-            final String color => color,
-            _ => null,
-          },
+          icon: _text(map['icon']),
+          color: _text(map['color']),
+          size: _text(map['size']),
+          style: _text(map['style']),
+          show: _text(map['show']),
         );
       }
     }
@@ -158,33 +166,88 @@ class DeckButton {
   }
 }
 
+/// A page of buttons. [size] is one of [pageSizes] (null: medium), [icon]
+/// its icon in the page rail, and [background] one of the button colors.
 class DeckPage {
-  const DeckPage({required this.name, required this.buttons});
+  const DeckPage({
+    required this.name,
+    required this.buttons,
+    this.size,
+    this.icon,
+    this.background,
+  });
 
   final String name;
   final List<DeckButton> buttons;
+  final String? size;
+  final String? icon;
+  final String? background;
 
   Map<String, Object> toJson() => {
     'name': name,
     'buttons': [for (final button in buttons) button.toJson()],
+    'size': ?size,
+    'icon': ?icon,
+    'background': ?background,
   };
 
   static DeckPage? fromJson(Object? json) {
-    if (json case {
-      'name': final String name,
-      'buttons': final List<Object?> buttons,
-    }) {
+    if (json
+        case final Map<String, Object?> map &&
+            {
+              'name': final String name,
+              'buttons': final List<Object?> buttons,
+            }) {
       if (_readAll(buttons, DeckButton.fromJson)
           case final List<DeckButton> read) {
-        return DeckPage(name: name, buttons: read);
+        return DeckPage(
+          name: name,
+          buttons: read,
+          size: _text(map['size']),
+          icon: _text(map['icon']),
+          background: _text(map['background']),
+        );
       }
     }
     return null;
   }
 
-  DeckPage _withButtons(List<DeckButton> buttons) =>
-      DeckPage(name: name, buttons: List.unmodifiable(buttons));
+  DeckPage _withButtons(List<DeckButton> buttons) => DeckPage(
+    name: name,
+    buttons: List.unmodifiable(buttons),
+    size: size,
+    icon: icon,
+    background: background,
+  );
 }
+
+/// Button shapes: one place, two wide, two tall, or two by two.
+const buttonSizes = {
+  null: 'Normal',
+  'wide': 'Wide',
+  'tall': 'Tall',
+  'big': 'Big',
+};
+
+/// Button styles: a soft tint, a solid color, or only an outline.
+const buttonStyles = {null: 'Tinted', 'solid': 'Solid', 'outline': 'Outline'};
+
+/// What a button shows: its icon and name, only the icon, or only the name.
+const buttonShows = {
+  null: 'Icon and name',
+  'icon': 'Icon only',
+  'name': 'Name only',
+};
+
+/// How big a page's buttons are.
+const pageSizes = {
+  'small': 'Small',
+  null: 'Medium',
+  'large': 'Large',
+  'huge': 'Huge',
+};
+
+String? _text(Object? value) => value is String ? value : null;
 
 /// The pages of buttons the PC keeps. Each edit returns a new deck, which the
 /// app sends to the PC to check and save.
@@ -240,8 +303,23 @@ class Deck {
     List.unmodifiable([...pages, DeckPage(name: name, buttons: const [])]),
   );
 
-  Deck renamedPage(int page, String name) =>
-      _editPage(page, (p) => DeckPage(name: name, buttons: p.buttons));
+  /// Changes a page's name and look, keeping its buttons.
+  Deck changedPage(
+    int page, {
+    required String name,
+    String? size,
+    String? icon,
+    String? background,
+  }) => _editPage(
+    page,
+    (p) => DeckPage(
+      name: name,
+      buttons: p.buttons,
+      size: size,
+      icon: icon,
+      background: background,
+    ),
+  );
 
   Deck withoutPage(int page) => Deck(
     List.unmodifiable([

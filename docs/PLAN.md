@@ -102,6 +102,16 @@ and tablet.
    forget, FPS and CPU temperature checks), and a Windows tray app instead of the PowerShell window (QR
    code, paired phones, status, start with Windows).
 
+## Customizing (picked after the new look)
+
+- **Saved in the deck on the PC, so every phone gets them:** button size per page (small, medium, large,
+  huge); button shape (normal, wide, tall, big); button style (tinted, solid, outline); labels (icon and
+  name, icon only, name only); folders of buttons; your own picture on a button; page icon; page background
+  (a color or a wallpaper). Pictures are resized on the phone and kept on the PC.
+- **Saved on each phone:** themes (Midnight, Carbon, Neon, Racing red); full screen with the screen kept
+  on; haptics and a click sound; spacing and corners; which home cards show (music, clock and PC); big
+  CPU, GPU, RAM and FPS cards; backup and share a deck or a page as a file.
+
 ## Built in features (instead of Stream Deck plugins)
 
 The most popular Stream Deck plugins are closed source, and Marketplace plugins have used Elgato's DRM

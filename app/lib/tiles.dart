@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/look.dart';
 import 'package:flutter/material.dart';
@@ -42,67 +44,98 @@ double statMaximum(String stat, [Map<String, double> stats = const {}]) =>
       _ => 100,
     };
 
-/// A button: its icon over its label, tinted in its [color]. Dimmed and off
-/// while [onTap] is null.
+/// A button: its icon over its label in its [color]. [style] is null
+/// (tinted), 'solid' or 'outline'; [show] is null (icon and name), 'icon' or
+/// 'name'. Dimmed and off while [onTap] is null.
 class KeyTile extends StatelessWidget {
   const KeyTile({
     super.key,
     required this.icon,
     required this.label,
     required this.color,
+    this.style,
+    this.show,
     this.onTap,
   });
 
   final IconData icon;
   final String label;
   final Color color;
+  final String? style;
+  final String? show;
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    enabled: onTap != null,
-    child: Opacity(
-      opacity: onTap == null ? 0.45 : 1,
-      child: Material(
-        color: color.withValues(alpha: 0.14),
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(DeckLook.radius),
-          side: BorderSide(color: color.withValues(alpha: 0.35)),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          splashColor: color.withValues(alpha: 0.3),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              spacing: 8,
-              children: [
-                Icon(
-                  icon,
-                  size: 34,
-                  color: Color.lerp(color, Colors.white, 0.3),
-                ),
-                Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: DeckLook.text,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+  Widget build(BuildContext context) {
+    final onColor = Color.lerp(color, Colors.black, 0.78)!;
+    final (fill, edge, ink, text) = switch (style) {
+      'solid' => (color, color, onColor, onColor),
+      'outline' => (Colors.transparent, color, color, DeckLook.text),
+      _ => (
+        color.withValues(alpha: 0.14),
+        color.withValues(alpha: 0.35),
+        Color.lerp(color, Colors.white, 0.3)!,
+        DeckLook.text,
+      ),
+    };
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: show == 'icon' ? label : null,
+      child: Opacity(
+        opacity: onTap == null ? 0.45 : 1,
+        child: Material(
+          color: fill,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(DeckLook.radius),
+            side: BorderSide(color: edge, width: style == 'outline' ? 1.5 : 1),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            splashColor: color.withValues(alpha: 0.3),
+            child: LayoutBuilder(
+              builder: (context, size) {
+                // Bigger buttons get a bigger icon and name.
+                final side = min(size.maxWidth, size.maxHeight);
+                return Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    spacing: 8,
+                    children: [
+                      if (show != 'name')
+                        Icon(
+                          icon,
+                          size: (side * (show == 'icon' ? 0.42 : 0.24))
+                              .clamp(20, 120)
+                              .toDouble(),
+                          color: ink,
+                        ),
+                      if (show != 'icon')
+                        Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: text,
+                            fontSize: (side * (show == 'name' ? 0.14 : 0.08))
+                                .clamp(12, 28)
+                                .toDouble(),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// A PC or sim reading as a big number, a ring gauge or a chart of the last

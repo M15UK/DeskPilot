@@ -64,6 +64,34 @@ void main() {
     expect(pressed, isNull);
   });
 
+  testWidgets('the music card sits beside the page rail, not above it', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: DeckView(
+            deck: deck,
+            page: 0,
+            editing: false,
+            onPress: null,
+            onChange: _ignore,
+            onPageChanged: _ignore,
+            header: Text('Now playing'),
+          ),
+        ),
+      ),
+    );
+
+    final rail = tester.getTopRight(find.text('Main'));
+    final header = tester.getTopLeft(find.text('Now playing'));
+    expect(header.dx, greaterThan(rail.dx));
+    expect(
+      header.dy,
+      lessThan(tester.getTopLeft(find.text('Play / Pause')).dy),
+    );
+  });
+
   testWidgets('the page chips switch pages', (tester) async {
     await tester.pumpWidget(host());
 
@@ -175,6 +203,69 @@ void main() {
     await tester.pumpAndSettle();
 
     expect([for (final b in changed!.pages[0].buttons) b.id], ['b', 'a']);
+  });
+
+  testWidgets('a button can be wide, solid and show only its icon', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(editing: true));
+
+    await tester.tap(find.text('Play / Pause'));
+    await tester.pumpAndSettle();
+    for (final choice in ['Wide', 'Solid', 'Icon only']) {
+      await tester.ensureVisible(find.text(choice));
+      await tester.tap(find.text(choice));
+      await tester.pump();
+    }
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final saved = changed!.pages[0].buttons.single;
+    expect((saved.size, saved.style, saved.show), ('wide', 'solid', 'icon'));
+  });
+
+  testWidgets('an icon only button still says its name to screen readers', (
+    tester,
+  ) async {
+    const iconOnly = Deck([
+      DeckPage(
+        name: 'Main',
+        buttons: [
+          DeckButton(
+            id: 'n',
+            label: 'Next song',
+            action: MediaAction('next'),
+            show: 'icon',
+          ),
+        ],
+      ),
+    ]);
+    await tester.pumpWidget(host(shown: iconOnly));
+
+    expect(find.text('Next song'), findsNothing);
+    expect(find.bySemanticsLabel('Next song'), findsOneWidget);
+  });
+
+  testWidgets('page settings change the button size and background', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(editing: true));
+
+    await tester.tap(find.text('Page settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Large'));
+    await tester.ensureVisible(find.byTooltip('purple').last);
+    await tester.tap(find.byTooltip('purple').last);
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final main = changed!.pages[0];
+    expect(
+      (main.name, main.size, main.background),
+      ('Main', 'large', 'purple'),
+    );
+    expect(main.buttons, hasLength(1));
   });
 
   testWidgets('adds a page in edit mode', (tester) async {
@@ -296,3 +387,5 @@ void main() {
     expect(statMaximum('fuel', {'fuelMax': 65}), 65);
   });
 }
+
+void _ignore(Object? _) {}

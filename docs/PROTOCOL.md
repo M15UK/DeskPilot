@@ -73,4 +73,7 @@ A deck has 1 to 20 pages, a page up to 32 buttons, and every page name and butto
 characters. Button ids are unique across the deck, up to 64 characters. A button may have an `icon` (a name
 of up to 40 lowercase letters, digits and `_`, from the app's icon set) and a `color` (`red`, `amber`,
 `green`, `teal`, `blue`, `purple`, `pink` or `gray`). Without them the app picks both from what the button
-does.
+does. It may also have a `size` (`wide`, `tall` or `big`; left out it takes one place), a `style` (`solid`
+or `outline`; left out it is tinted) and a `show` (`icon` or `name`; left out it shows both). A page may
+have a `size` for its buttons (`small`, `medium`, `large` or `huge`), an `icon` for the page rail, and a
+`background` color.

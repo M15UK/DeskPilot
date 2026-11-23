@@ -79,6 +79,9 @@ class _ButtonEditorState extends State<ButtonEditor> {
   // Null means automatic: picked from what the button does.
   late String? _icon = widget.button?.icon;
   late String? _color = widget.button?.color;
+  late String? _size = widget.button?.size;
+  late String? _look = widget.button?.style;
+  late String? _show = widget.button?.show;
 
   @override
   void dispose() {
@@ -111,6 +114,10 @@ class _ButtonEditorState extends State<ButtonEditor> {
       action: action,
       icon: _icon,
       color: _color,
+      size: _size,
+      // Stat tiles always show their reading the same way.
+      style: action is StatAction ? null : _look,
+      show: action is StatAction ? null : _show,
     );
   }
 
@@ -139,6 +146,8 @@ class _ButtonEditorState extends State<ButtonEditor> {
             icon: buttonIcon(button),
             label: button.label,
             color: buttonColor(button),
+            style: button.style,
+            show: button.show,
             onTap: () {},
           ),
         },
@@ -284,6 +293,26 @@ class _ButtonEditorState extends State<ButtonEditor> {
               },
               if (_kind != 'stat') _iconPicker(),
               _colorPicker(),
+              _Options(
+                title: 'Shape',
+                choices: buttonSizes,
+                selected: _size,
+                onSelect: (size) => setState(() => _size = size),
+              ),
+              if (_kind != 'stat') ...[
+                _Options(
+                  title: 'Style',
+                  choices: buttonStyles,
+                  selected: _look,
+                  onSelect: (look) => setState(() => _look = look),
+                ),
+                _Options(
+                  title: 'Show',
+                  choices: buttonShows,
+                  selected: _show,
+                  onSelect: (show) => setState(() => _show = show),
+                ),
+              ],
             ],
           ),
         ),
@@ -322,27 +351,32 @@ sealed class PageEdit {
   const PageEdit();
 }
 
-final class RenamePage extends PageEdit {
-  const RenamePage(this.name);
+/// The page's name and look, to save.
+final class SavePage extends PageEdit {
+  const SavePage({required this.name, this.size, this.icon, this.background});
 
   final String name;
+  final String? size;
+  final String? icon;
+  final String? background;
 }
 
 final class DeletePage extends PageEdit {
   const DeletePage();
 }
 
-/// Names a new page, or renames or deletes the current one.
+/// Names a new page, or changes or deletes [page]: its name, button size,
+/// icon and background.
 class PageEditor extends StatefulWidget {
   const PageEditor({
     super.key,
     required this.title,
-    this.name = '',
+    this.page,
     this.canDelete = false,
   });
 
   final String title;
-  final String name;
+  final DeckPage? page;
   final bool canDelete;
 
   @override
@@ -351,7 +385,10 @@ class PageEditor extends StatefulWidget {
 
 class _PageEditorState extends State<PageEditor> {
   final _form = GlobalKey<FormState>();
-  late final _name = TextEditingController(text: widget.name);
+  late final _name = TextEditingController(text: widget.page?.name);
+  late String? _size = widget.page?.size;
+  late String? _icon = widget.page?.icon;
+  late String? _background = widget.page?.background;
 
   @override
   void dispose() {
@@ -361,7 +398,14 @@ class _PageEditorState extends State<PageEditor> {
 
   void _save() {
     if (!(_form.currentState?.validate() ?? false)) return;
-    Navigator.of(context).pop(RenamePage(_name.text.trim()));
+    Navigator.of(context).pop(
+      SavePage(
+        name: _name.text.trim(),
+        size: _size,
+        icon: _icon,
+        background: _background,
+      ),
+    );
   }
 
   @override
@@ -369,13 +413,64 @@ class _PageEditorState extends State<PageEditor> {
     title: Text(widget.title),
     content: Form(
       key: _form,
-      child: TextFormField(
-        controller: _name,
-        autofocus: true,
-        maxLength: _maxTextLength,
-        decoration: const InputDecoration(labelText: 'Page name'),
-        validator: (text) => _required(text, 'Give the page a name'),
-        onFieldSubmitted: (_) => _save(),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 16,
+          children: [
+            TextFormField(
+              controller: _name,
+              autofocus: widget.page == null,
+              maxLength: _maxTextLength,
+              decoration: const InputDecoration(labelText: 'Page name'),
+              validator: (text) => _required(text, 'Give the page a name'),
+              onFieldSubmitted: (_) => _save(),
+            ),
+            _Options(
+              title: 'Button size',
+              choices: pageSizes,
+              selected: _size,
+              onSelect: (size) => setState(() => _size = size),
+            ),
+            _Choices(
+              title: 'Icon',
+              choices: [
+                _Choice(
+                  name: 'Automatic',
+                  selected: _icon == null,
+                  onTap: () => setState(() => _icon = null),
+                  child: const Icon(Icons.auto_awesome_rounded),
+                ),
+                for (final MapEntry(:key, :value) in deckIcons.entries)
+                  _Choice(
+                    name: key.replaceAll('_', ' '),
+                    selected: _icon == key,
+                    onTap: () => setState(() => _icon = key),
+                    child: Icon(value),
+                  ),
+              ],
+            ),
+            _Choices(
+              title: 'Background',
+              choices: [
+                _Choice(
+                  name: 'None',
+                  selected: _background == null,
+                  onTap: () => setState(() => _background = null),
+                  child: const Icon(Icons.block_rounded),
+                ),
+                for (final MapEntry(:key, :value) in deckColors.entries)
+                  _Choice(
+                    name: key,
+                    selected: _background == key,
+                    onTap: () => setState(() => _background = key),
+                    child: CircleAvatar(radius: 11, backgroundColor: value),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     ),
     actions: [
@@ -389,6 +484,42 @@ class _PageEditorState extends State<PageEditor> {
         child: const Text('Cancel'),
       ),
       FilledButton(onPressed: _save, child: const Text('Save')),
+    ],
+  );
+}
+
+/// A titled row of chips to pick one of [choices] (value to its name).
+class _Options extends StatelessWidget {
+  const _Options({
+    required this.title,
+    required this.choices,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final String title;
+  final Map<String?, String> choices;
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    spacing: 8,
+    children: [
+      Text(title, style: const TextStyle(color: DeckLook.muted, fontSize: 12)),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final MapEntry(:key, :value) in choices.entries)
+            ChoiceChip(
+              label: Text(value),
+              selected: selected == key,
+              onSelected: (_) => onSelect(key),
+            ),
+        ],
+      ),
     ],
   );
 }

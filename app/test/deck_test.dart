@@ -8,10 +8,10 @@ const pcDeck =
     '{"pages":[{"name":"Main","buttons":['
     '{"id":"previous","label":"Previous","action":{"kind":"media","media":"previous"}},'
     '{"id":"play-pause","label":"Play / Pause","action":{"kind":"media","media":"playPause"}},'
-    '{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]},"icon":"flag","color":"amber"},'
+    '{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]},"icon":"flag","color":"amber","show":"icon"},'
     '{"id":"ac","label":"Assetto Corsa","action":{"kind":"open","target":"steam://rungameid/244210"}},'
-    '{"id":"cpu","label":"CPU","action":{"kind":"stat","stat":"cpuLoad","style":"gauge"}}'
-    ']}]}';
+    '{"id":"cpu","label":"CPU","action":{"kind":"stat","stat":"cpuLoad","style":"gauge"},"size":"wide","style":"outline"}'
+    '],"size":"large","icon":"home","background":"blue"}]}';
 
 Deck sample() => Deck.fromJson(jsonDecode(pcDeck))!;
 
@@ -99,10 +99,21 @@ void main() {
   });
 
   test('adds, renames and deletes pages', () {
-    final deck = sample().withPage('Racing').renamedPage(1, 'Sim racing');
+    final deck = sample().withPage('Racing').changedPage(1, name: 'Sim racing');
 
     expect([for (final page in deck.pages) page.name], ['Main', 'Sim racing']);
     expect(deck.withoutPage(0).pages.single.name, 'Sim racing');
+  });
+
+  test('a page keeps its button size through button edits', () {
+    final deck = sample()
+        .changedPage(0, name: 'Home', size: 'small')
+        .withoutButton('pit')
+        .movedButton('cpu', -1);
+
+    expect(deck.pages[0].name, 'Home');
+    expect(deck.pages[0].size, 'small');
+    expect(deck.pages[0].buttons[2].size, 'wide');
   });
 
   test('new button ids are unique', () {

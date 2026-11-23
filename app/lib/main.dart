@@ -280,11 +280,6 @@ class _DeckPageState extends State<DeckPage> {
           ),
         ],
         const SizedBox(height: 12),
-        // The music card sits on top of the first page, like a home screen.
-        if (media != null && page == 0 && !_editing) ...[
-          NowPlayingCard(media: media, onKey: agent?.mediaKey),
-          const SizedBox(height: 12),
-        ],
         Expanded(
           child: deck == null
               ? const SizedBox.shrink()
@@ -297,9 +292,133 @@ class _DeckPageState extends State<DeckPage> {
                   onPageChanged: (page) => setState(() => _page = page),
                   stats: {..._stats, ..._telemetry},
                   history: _history,
+                  // The first page is the home screen: the song and the PC.
+                  header: media != null && page == 0 && !_editing
+                      ? IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            spacing: 10,
+                            children: [
+                              Expanded(
+                                child: NowPlayingCard(
+                                  media: media,
+                                  onKey: agent?.mediaKey,
+                                ),
+                              ),
+                              _PcCard(name: agent?.pcName, stats: _stats),
+                            ],
+                          ),
+                        )
+                      : null,
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// The clock, which PC this is, and its CPU temperature and FPS, beside the
+/// music card.
+class _PcCard extends StatelessWidget {
+  const _PcCard({required this.name, required this.stats});
+
+  /// Null while the PC isn't connected.
+  final String? name;
+  final Map<String, double> stats;
+
+  static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const _months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    // 10:28 PM or 22:28, as the phone is set.
+    final time = MaterialLocalizations.of(context).formatTimeOfDay(
+      TimeOfDay.fromDateTime(now),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+    );
+    final (cpuTemp, fps) = (stats['cpuTemp'], stats['fps']);
+    final pc = name;
+    return Card(
+      child: SizedBox(
+        width: 170,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                time,
+                style: const TextStyle(
+                  color: DeckLook.text,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                '${_days[now.weekday - 1]} ${now.day} ${_months[now.month - 1]}',
+                style: const TextStyle(color: DeckLook.muted, fontSize: 12),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                spacing: 6,
+                children: [
+                  Icon(
+                    Icons.circle,
+                    size: 8,
+                    color: pc == null ? DeckLook.muted : deckColors['green'],
+                  ),
+                  Expanded(
+                    child: Text(
+                      pc ?? 'Not connected',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: DeckLook.text,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (cpuTemp != null || fps != null)
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      if (cpuTemp != null)
+                        TextSpan(
+                          text: formatStat('cpuTemp', cpuTemp),
+                          style: TextStyle(color: deckColors['amber']),
+                        ),
+                      if (cpuTemp != null && fps != null)
+                        const TextSpan(text: '  ·  '),
+                      if (fps != null)
+                        TextSpan(
+                          text: '${formatStat('fps', fps)} fps',
+                          style: TextStyle(color: deckColors['green']),
+                        ),
+                    ],
+                  ),
+                  style: const TextStyle(color: DeckLook.muted, fontSize: 12),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

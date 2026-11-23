@@ -4,12 +4,19 @@ import 'dart:math';
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/editor.dart';
 import 'package:deskpilot/look.dart';
+import 'package:deskpilot/tile_grid.dart';
 import 'package:deskpilot/tiles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 // Same limit as Deck.MaxButtonsPerPage on the PC.
 const _maxButtonsPerPage = 32;
+
+/// About how wide a button is for each page size.
+const _cellSizes = {'small': 120.0, null: 170.0, 'large': 230.0, 'huge': 300.0};
+
+/// How many cells (wide, tall) each button shape takes.
+const _spans = {'wide': (2, 1), 'tall': (1, 2), 'big': (2, 2)};
 
 /// Wider than this, pages sit in a rail on the left (tablets); narrower, they
 /// are chips under the grid (phones).
@@ -29,6 +36,7 @@ class DeckView extends StatelessWidget {
     required this.onPageChanged,
     this.stats = const {},
     this.history = const {},
+    this.header,
   });
 
   final Deck deck;
@@ -46,6 +54,9 @@ class DeckView extends StatelessWidget {
   /// The last minute of each reading, oldest first, for chart tiles.
   final Map<String, List<double>> history;
 
+  /// Shown above the buttons and beside the page rail, like the music card.
+  final Widget? header;
+
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, size) {
@@ -55,36 +66,58 @@ class DeckView extends StatelessWidget {
           spacing: 12,
           children: [
             _PageRail(
-              names: [for (final p in deck.pages) p.name],
+              pages: deck.pages,
               selected: page,
               onSelect: onPageChanged,
               extras: editing ? _pageActions(context) : const [],
             ),
-            Expanded(child: _grid(context)),
+            Expanded(child: _withHeader(_grid(context))),
           ],
         );
       }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: _grid(context)),
+          Expanded(child: _withHeader(_grid(context))),
           if (deck.pages.length > 1 || editing) _pageChips(context),
         ],
       );
     },
   );
 
+  Widget _withHeader(Widget grid) => switch (header) {
+    final Widget header => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 10,
+      children: [
+        header,
+        Expanded(child: grid),
+      ],
+    ),
+    null => grid,
+  };
+
   Widget _grid(BuildContext context) {
-    final buttons = deck.pages[page].buttons;
-    return GridView.extent(
-      maxCrossAxisExtent: 170,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      padding: const EdgeInsets.only(bottom: 12),
+    final shown = deck.pages[page];
+    final buttons = shown.buttons;
+    final adding = editing && buttons.length < _maxButtonsPerPage;
+    final grid = TileGrid(
+      cell: _cellSizes[shown.size] ?? _cellSizes[null]!,
+      gap: 10,
+      padding: EdgeInsets.fromLTRB(
+        shown.background == null ? 0 : 10,
+        shown.background == null ? 0 : 10,
+        shown.background == null ? 0 : 10,
+        12,
+      ),
+      spans: [
+        for (final button in buttons) _spans[button.size] ?? (1, 1),
+        if (adding) (1, 1),
+      ],
       children: [
         for (final (index, button) in buttons.indexed)
           _placed(context, button, index),
-        if (editing && buttons.length < _maxButtonsPerPage)
+        if (adding)
           OutlinedButton.icon(
             onPressed: () => _editButton(context, null),
             style: OutlinedButton.styleFrom(
@@ -98,6 +131,16 @@ class DeckView extends StatelessWidget {
             label: const Text('Add button'),
           ),
       ],
+    );
+    final background = deckColors[shown.background];
+    if (background == null) return grid;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(DeckLook.radius),
+        border: Border.all(color: background.withValues(alpha: 0.25)),
+      ),
+      child: grid,
     );
   }
 
@@ -135,9 +178,10 @@ class DeckView extends StatelessWidget {
                     ),
                   ),
                 ),
+              // Top right: stat tiles have their label top left.
               const Positioned(
                 top: 6,
-                left: 6,
+                right: 6,
                 child: IgnorePointer(
                   child: Icon(
                     Icons.drag_indicator_rounded,
@@ -171,6 +215,8 @@ class DeckView extends StatelessWidget {
       icon: buttonIcon(button),
       label: button.label,
       color: buttonColor(button),
+      style: button.style,
+      show: button.show,
       onTap:
           edit ??
           (press == null
@@ -204,7 +250,7 @@ class DeckView extends StatelessWidget {
         children: [
           for (final (index, deckPage) in deck.pages.indexed)
             ChoiceChip(
-              avatar: Icon(pageIcon(deckPage.name)),
+              avatar: Icon(deckIcons[deckPage.icon] ?? pageIcon(deckPage.name)),
               label: Text(deckPage.name),
               selected: index == page,
               onSelected: (_) => onPageChanged(index),
@@ -244,8 +290,22 @@ class DeckView extends StatelessWidget {
       context: context,
       builder: (_) => const PageEditor(title: 'Add page'),
     );
-    if (edit case RenamePage(:final name)) {
-      onChange(deck.withPage(name));
+    if (edit case SavePage(
+      :final name,
+      :final size,
+      :final icon,
+      :final background,
+    )) {
+      final added = deck.withPage(name);
+      onChange(
+        added.changedPage(
+          added.pages.length - 1,
+          name: name,
+          size: size,
+          icon: icon,
+          background: background,
+        ),
+      );
       onPageChanged(deck.pages.length);
     }
   }
@@ -255,13 +315,21 @@ class DeckView extends StatelessWidget {
       context: context,
       builder: (_) => PageEditor(
         title: 'Page settings',
-        name: deck.pages[page].name,
+        page: deck.pages[page],
         canDelete: deck.pages.length > 1,
       ),
     );
     switch (edit) {
-      case RenamePage(:final name):
-        onChange(deck.renamedPage(page, name));
+      case SavePage(:final name, :final size, :final icon, :final background):
+        onChange(
+          deck.changedPage(
+            page,
+            name: name,
+            size: size,
+            icon: icon,
+            background: background,
+          ),
+        );
       case DeletePage():
         onChange(deck.withoutPage(page));
         onPageChanged(max(0, page - 1));
@@ -274,13 +342,13 @@ class DeckView extends StatelessWidget {
 /// The pages down the left side of a tablet, like a sidebar.
 class _PageRail extends StatelessWidget {
   const _PageRail({
-    required this.names,
+    required this.pages,
     required this.selected,
     required this.onSelect,
     required this.extras,
   });
 
-  final List<String> names;
+  final List<DeckPage> pages;
   final int selected;
   final ValueChanged<int> onSelect;
   final List<_RailItem> extras;
@@ -296,10 +364,10 @@ class _PageRail extends StatelessWidget {
     child: ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
-        for (final (index, name) in names.indexed)
+        for (final (index, page) in pages.indexed)
           _RailItem(
-            icon: pageIcon(name),
-            label: name,
+            icon: deckIcons[page.icon] ?? pageIcon(page.name),
+            label: page.name,
             selected: index == selected,
             onTap: () => onSelect(index),
           ),
