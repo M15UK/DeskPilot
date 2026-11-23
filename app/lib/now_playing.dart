@@ -112,21 +112,25 @@ class NowPlayingCard extends StatelessWidget {
   final NowPlaying media;
   final ValueChanged<String>? onKey;
 
-  static const _tint = Color(0xFF15213A);
-  static const _soft = Color(0xFFB7C3DB);
-  static const _faint = Color(0xFF8FA3C8);
-
   @override
   Widget build(BuildContext context) {
     final position = media.positionAt(DateTime.now());
     final duration = media.duration;
     final key = onKey;
+    final look = DeckLook.of(context);
+    // The card takes a little of the theme's accent color.
+    final tint = Color.alphaBlend(
+      look.accent.withValues(alpha: 0.10),
+      look.card,
+    );
+    final soft = Color.lerp(look.muted, look.text, 0.5)!;
+    final faint = look.muted;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _tint,
-        borderRadius: BorderRadius.circular(DeckLook.radius),
-        border: Border.all(color: const Color(0xFF22325A)),
+        color: tint,
+        borderRadius: BorderRadius.circular(DeckLook.of(context).radius),
+        border: Border.all(color: look.cardBorder),
       ),
       child: Row(
         spacing: 14,
@@ -156,15 +160,15 @@ class NowPlayingCard extends StatelessWidget {
                   'Playing on your PC, ${media.app}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: _faint, fontSize: 11),
+                  style: TextStyle(color: faint, fontSize: 11),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   media.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: DeckLook.text,
+                  style: TextStyle(
+                    color: DeckLook.of(context).text,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -173,7 +177,7 @@ class NowPlayingCard extends StatelessWidget {
                   media.artist,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: _soft, fontSize: 13),
+                  style: TextStyle(color: soft, fontSize: 13),
                 ),
                 if (position != null && duration != null && duration > 0) ...[
                   const SizedBox(height: 8),
@@ -182,13 +186,13 @@ class NowPlayingCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: position / duration,
                       minHeight: 4,
-                      color: DeckLook.text,
-                      backgroundColor: const Color(0xFF2A3A5E),
+                      color: DeckLook.of(context).text,
+                      backgroundColor: look.cardBorder,
                     ),
                   ),
                   const SizedBox(height: 2),
                   DefaultTextStyle(
-                    style: const TextStyle(color: _faint, fontSize: 11),
+                    style: TextStyle(color: faint, fontSize: 11),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -202,15 +206,15 @@ class NowPlayingCard extends StatelessWidget {
                   children: [
                     IconButton(
                       tooltip: 'Previous',
-                      color: _soft,
+                      color: soft,
                       onPressed: key == null ? null : () => key('previous'),
                       icon: const Icon(Icons.skip_previous_rounded),
                     ),
                     IconButton.filled(
                       tooltip: media.playing ? 'Pause' : 'Play',
                       style: IconButton.styleFrom(
-                        backgroundColor: DeckLook.text,
-                        foregroundColor: _tint,
+                        backgroundColor: DeckLook.of(context).text,
+                        foregroundColor: tint,
                       ),
                       onPressed: key == null ? null : () => key('playPause'),
                       icon: Icon(
@@ -221,7 +225,7 @@ class NowPlayingCard extends StatelessWidget {
                     ),
                     IconButton(
                       tooltip: 'Next',
-                      color: _soft,
+                      color: soft,
                       onPressed: key == null ? null : () => key('next'),
                       icon: const Icon(Icons.skip_next_rounded),
                     ),

@@ -70,12 +70,17 @@ class KeyTile extends StatelessWidget {
     final onColor = Color.lerp(color, Colors.black, 0.78)!;
     final (fill, edge, ink, text) = switch (style) {
       'solid' => (color, color, onColor, onColor),
-      'outline' => (Colors.transparent, color, color, DeckLook.text),
+      'outline' => (
+        Colors.transparent,
+        color,
+        color,
+        DeckLook.of(context).text,
+      ),
       _ => (
         color.withValues(alpha: 0.14),
         color.withValues(alpha: 0.35),
         Color.lerp(color, Colors.white, 0.3)!,
-        DeckLook.text,
+        DeckLook.of(context).text,
       ),
     };
     return Semantics(
@@ -88,7 +93,7 @@ class KeyTile extends StatelessWidget {
           color: fill,
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(DeckLook.radius),
+            borderRadius: BorderRadius.circular(DeckLook.of(context).radius),
             side: BorderSide(color: edge, width: style == 'outline' ? 1.5 : 1),
           ),
           child: InkWell(
@@ -164,8 +169,8 @@ class StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final reading = Text(
       formatStat(action.stat, value),
-      style: const TextStyle(
-        color: DeckLook.text,
+      style: TextStyle(
+        color: DeckLook.of(context).text,
         fontSize: 26,
         fontWeight: FontWeight.w600,
       ),
@@ -204,7 +209,7 @@ class StatTile extends StatelessWidget {
                               strokeWidth: 7,
                               strokeCap: StrokeCap.round,
                               color: color,
-                              backgroundColor: DeckLook.cardBorder,
+                              backgroundColor: DeckLook.of(context).cardBorder,
                             ),
                           ),
                         ),

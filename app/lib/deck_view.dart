@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 
 import 'package:deskpilot/deck.dart';
@@ -7,10 +6,12 @@ import 'package:deskpilot/look.dart';
 import 'package:deskpilot/tile_grid.dart';
 import 'package:deskpilot/tiles.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 // Same limit as Deck.MaxButtonsPerPage on the PC.
 const _maxButtonsPerPage = 32;
+
+/// A button at the end of the page rail.
+typedef RailTool = ({IconData icon, String label, VoidCallback onTap});
 
 /// About how wide a button is for each page size.
 const _cellSizes = {'small': 120.0, null: 170.0, 'large': 230.0, 'huge': 300.0};
@@ -37,6 +38,7 @@ class DeckView extends StatelessWidget {
     this.stats = const {},
     this.history = const {},
     this.header,
+    this.tools = const [],
   });
 
   final Deck deck;
@@ -57,6 +59,10 @@ class DeckView extends StatelessWidget {
   /// Shown above the buttons and beside the page rail, like the music card.
   final Widget? header;
 
+  /// Extra buttons at the end of the page rail, like settings while full
+  /// screen hides the top bar.
+  final List<RailTool> tools;
+
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, size) {
@@ -69,7 +75,15 @@ class DeckView extends StatelessWidget {
               pages: deck.pages,
               selected: page,
               onSelect: onPageChanged,
-              extras: editing ? _pageActions(context) : const [],
+              extras: [
+                if (editing) ..._pageActions(context),
+                for (final tool in tools)
+                  _RailItem(
+                    icon: tool.icon,
+                    label: tool.label,
+                    onTap: tool.onTap,
+                  ),
+              ],
             ),
             Expanded(child: _withHeader(_grid(context))),
           ],
@@ -103,7 +117,7 @@ class DeckView extends StatelessWidget {
     final adding = editing && buttons.length < _maxButtonsPerPage;
     final grid = TileGrid(
       cell: _cellSizes[shown.size] ?? _cellSizes[null]!,
-      gap: 10,
+      gap: DeckLook.of(context).gap,
       padding: EdgeInsets.fromLTRB(
         shown.background == null ? 0 : 10,
         shown.background == null ? 0 : 10,
@@ -121,10 +135,15 @@ class DeckView extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: () => _editButton(context, null),
             style: OutlinedButton.styleFrom(
-              foregroundColor: DeckLook.muted,
-              side: const BorderSide(color: DeckLook.cardBorder, width: 1.5),
+              foregroundColor: DeckLook.of(context).muted,
+              side: BorderSide(
+                color: DeckLook.of(context).cardBorder,
+                width: 1.5,
+              ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(DeckLook.radius),
+                borderRadius: BorderRadius.circular(
+                  DeckLook.of(context).radius,
+                ),
               ),
             ),
             icon: const Icon(Icons.add_rounded),
@@ -137,7 +156,7 @@ class DeckView extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: background.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(DeckLook.radius),
+        borderRadius: BorderRadius.circular(DeckLook.of(context).radius),
         border: Border.all(color: background.withValues(alpha: 0.25)),
       ),
       child: grid,
@@ -169,7 +188,9 @@ class DeckView extends StatelessWidget {
                   child: IgnorePointer(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(DeckLook.radius),
+                        borderRadius: BorderRadius.circular(
+                          DeckLook.of(context).radius,
+                        ),
                         border: Border.all(
                           color: deckColors['blue']!,
                           width: 2,
@@ -179,14 +200,14 @@ class DeckView extends StatelessWidget {
                   ),
                 ),
               // Top right: stat tiles have their label top left.
-              const Positioned(
+              Positioned(
                 top: 6,
                 right: 6,
                 child: IgnorePointer(
                   child: Icon(
                     Icons.drag_indicator_rounded,
                     size: 16,
-                    color: DeckLook.muted,
+                    color: DeckLook.of(context).muted,
                   ),
                 ),
               ),
@@ -217,14 +238,7 @@ class DeckView extends StatelessWidget {
       color: buttonColor(button),
       style: button.style,
       show: button.show,
-      onTap:
-          edit ??
-          (press == null
-              ? null
-              : () {
-                  unawaited(HapticFeedback.lightImpact());
-                  press(button.id);
-                }),
+      onTap: edit ?? (press == null ? null : () => press(button.id)),
     );
   }
 
@@ -357,9 +371,9 @@ class _PageRail extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: 84,
     decoration: BoxDecoration(
-      color: DeckLook.rail,
-      borderRadius: BorderRadius.circular(DeckLook.radius),
-      border: Border.all(color: DeckLook.cardBorder),
+      color: DeckLook.of(context).rail,
+      borderRadius: BorderRadius.circular(DeckLook.of(context).radius),
+      border: Border.all(color: DeckLook.of(context).cardBorder),
     ),
     child: ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -409,7 +423,9 @@ class _RailItem extends StatelessWidget {
               ),
               child: Icon(
                 icon,
-                color: selected ? DeckLook.text : DeckLook.muted,
+                color: selected
+                    ? DeckLook.of(context).text
+                    : DeckLook.of(context).muted,
               ),
             ),
             Text(
@@ -419,7 +435,9 @@ class _RailItem extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
-                color: selected ? DeckLook.text : DeckLook.muted,
+                color: selected
+                    ? DeckLook.of(context).text
+                    : DeckLook.of(context).muted,
               ),
             ),
           ],

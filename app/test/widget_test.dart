@@ -38,8 +38,12 @@ void main() {
     expect(find.textContaining("Couldn't reach GAMING-PC"), findsOneWidget);
     expect(find.text('Connect again'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Forget this PC'));
-    await tester.pump();
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Forget this PC'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Forget'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Scan the QR code'), findsOneWidget);
   });

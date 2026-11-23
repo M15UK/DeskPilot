@@ -507,7 +507,10 @@ class _Options extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     spacing: 8,
     children: [
-      Text(title, style: const TextStyle(color: DeckLook.muted, fontSize: 12)),
+      Text(
+        title,
+        style: TextStyle(color: DeckLook.of(context).muted, fontSize: 12),
+      ),
       Wrap(
         spacing: 8,
         runSpacing: 8,
@@ -536,7 +539,10 @@ class _Choices extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     spacing: 8,
     children: [
-      Text(title, style: const TextStyle(color: DeckLook.muted, fontSize: 12)),
+      Text(
+        title,
+        style: TextStyle(color: DeckLook.of(context).muted, fontSize: 12),
+      ),
       Wrap(spacing: 6, runSpacing: 6, children: choices),
     ],
   );
@@ -569,10 +575,12 @@ class _Choice extends StatelessWidget {
           height: 40,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: DeckLook.background,
+            color: DeckLook.of(context).background,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: selected ? DeckLook.text : DeckLook.cardBorder,
+              color: selected
+                  ? DeckLook.of(context).text
+                  : DeckLook.of(context).cardBorder,
               width: selected ? 2 : 1,
             ),
           ),

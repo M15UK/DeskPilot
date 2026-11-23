@@ -8,30 +8,79 @@ import 'package:deskpilot/look.dart';
 import 'package:deskpilot/now_playing.dart';
 import 'package:deskpilot/pairing.dart';
 import 'package:deskpilot/scan_page.dart';
+import 'package:deskpilot/settings.dart';
+import 'package:deskpilot/settings_page.dart';
 import 'package:deskpilot/tiles.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 void main() => runApp(const DeskPilotApp());
 
 const _telemetryTimeout = Duration(seconds: 2);
 
-class DeskPilotApp extends StatelessWidget {
-  const DeskPilotApp({super.key, this.store = const PcStore()});
+class DeskPilotApp extends StatefulWidget {
+  const DeskPilotApp({
+    super.key,
+    this.store = const PcStore(),
+    this.settingsStore = const SettingsStore(),
+  });
 
   final PcStore store;
+  final SettingsStore settingsStore;
+
+  @override
+  State<DeskPilotApp> createState() => _DeskPilotAppState();
+}
+
+class _DeskPilotAppState extends State<DeskPilotApp> {
+  AppSettings _settings = const AppSettings();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final settings = await widget.settingsStore.load();
+    if (!mounted) return;
+    setState(() => _settings = settings);
+    unawaited(applyScreen(settings));
+  }
+
+  void _change(AppSettings settings) {
+    setState(() => _settings = settings);
+    unawaited(widget.settingsStore.save(settings));
+    unawaited(applyScreen(settings));
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'DeskPilot',
-    theme: deckTheme,
-    home: DeckPage(store: store),
+    theme: deckTheme(
+      theme: _settings.theme,
+      spacing: _settings.spacing,
+      corners: _settings.corners,
+    ),
+    home: DeckPage(
+      store: widget.store,
+      settings: _settings,
+      onSettings: _change,
+    ),
   );
 }
 
 class DeckPage extends StatefulWidget {
-  const DeckPage({super.key, required this.store});
+  const DeckPage({
+    super.key,
+    required this.store,
+    this.settings = const AppSettings(),
+    this.onSettings,
+  });
 
   final PcStore store;
+  final AppSettings settings;
+  final ValueChanged<AppSettings>? onSettings;
 
   @override
   State<DeckPage> createState() => _DeckPageState();
@@ -202,27 +251,63 @@ class _DeckPageState extends State<DeckPage> {
     super.dispose();
   }
 
+  /// The vibration and click a press gives, as settings say.
+  void _feedback() {
+    if (widget.settings.haptics) unawaited(HapticFeedback.lightImpact());
+    if (widget.settings.clickSound) {
+      unawaited(SystemSound.play(SystemSoundType.click));
+    }
+  }
+
+  void _press(String id) {
+    _feedback();
+    _agent?.press(id);
+  }
+
+  void _mediaKey(String key) {
+    _feedback();
+    _agent?.mediaKey(key);
+  }
+
+  Future<void> _openSettings() => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => SettingsPage(
+        settings: widget.settings,
+        onChanged: (settings) => widget.onSettings?.call(settings),
+        pcName: _saved?.pc.name,
+        onForget: () => unawaited(_forget()),
+      ),
+    ),
+  );
+
+  /// Full screen hides the top bar on tablets; its buttons move to the rail.
+  bool _barHidden(BuildContext context) =>
+      widget.settings.fullScreen &&
+      _saved != null &&
+      MediaQuery.sizeOf(context).width >= 600;
+
   @override
   Widget build(BuildContext context) {
     final saved = _saved;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('DeskPilot'),
-        actions: [
-          if (saved != null && _deck != null)
-            IconButton(
-              onPressed: () => setState(() => _editing = !_editing),
-              tooltip: _editing ? 'Done editing' : 'Edit the deck',
-              icon: Icon(_editing ? Icons.check : Icons.edit),
+      appBar: _barHidden(context)
+          ? null
+          : AppBar(
+              title: const Text('DeskPilot'),
+              actions: [
+                if (saved != null && _deck != null)
+                  IconButton(
+                    onPressed: () => setState(() => _editing = !_editing),
+                    tooltip: _editing ? 'Done editing' : 'Edit the deck',
+                    icon: Icon(_editing ? Icons.check : Icons.edit),
+                  ),
+                IconButton(
+                  onPressed: _openSettings,
+                  tooltip: 'Settings',
+                  icon: const Icon(Icons.settings_rounded),
+                ),
+              ],
             ),
-          if (saved != null)
-            IconButton(
-              onPressed: _forget,
-              tooltip: 'Forget this PC',
-              icon: const Icon(Icons.link_off),
-            ),
-        ],
-      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -271,7 +356,9 @@ class _DeckPageState extends State<DeckPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(_status, textAlign: TextAlign.center),
+        // Full screen keeps quiet while all is well.
+        if (agent == null || !widget.settings.fullScreen)
+          Text(_status, textAlign: TextAlign.center),
         if (agent == null && !_busy) ...[
           const SizedBox(height: 12),
           OutlinedButton(
@@ -287,32 +374,91 @@ class _DeckPageState extends State<DeckPage> {
                   deck: deck,
                   page: page,
                   editing: _editing,
-                  onPress: agent?.press,
+                  onPress: agent == null ? null : _press,
                   onChange: _save,
                   onPageChanged: (page) => setState(() => _page = page),
                   stats: {..._stats, ..._telemetry},
                   history: _history,
-                  // The first page is the home screen: the song and the PC.
-                  header: media != null && page == 0 && !_editing
-                      ? IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            spacing: 10,
-                            children: [
-                              Expanded(
-                                child: NowPlayingCard(
-                                  media: media,
-                                  onKey: agent?.mediaKey,
-                                ),
-                              ),
-                              _PcCard(name: agent?.pcName, stats: _stats),
-                            ],
+                  header: _homeCards(page, media, agent),
+                  tools: _barHidden(context)
+                      ? [
+                          (
+                            icon: _editing
+                                ? Icons.check_rounded
+                                : Icons.edit_rounded,
+                            label: _editing ? 'Done' : 'Edit',
+                            onTap: () => setState(() => _editing = !_editing),
                           ),
-                        )
-                      : null,
+                          (
+                            icon: Icons.settings_rounded,
+                            label: 'Settings',
+                            onTap: () => unawaited(_openSettings()),
+                          ),
+                        ]
+                      : const [],
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// The home screen cards above the buttons: the song and the PC, and the big
+/// PC rings, as settings say. Null when there are none on this page.
+extension on _DeckPageState {
+  Widget? _homeCards(int page, NowPlaying? media, AgentConnection? agent) {
+    final settings = widget.settings;
+    if (_editing || (page != 0 && !settings.cardsOnEveryPage)) return null;
+    final top = [
+      if (settings.showMusic && media != null)
+        Expanded(
+          child: NowPlayingCard(
+            media: media,
+            onKey: agent == null ? null : _mediaKey,
+          ),
+        ),
+      if (settings.showClock) _PcCard(name: agent?.pcName, stats: _stats),
+    ];
+    final rows = [
+      if (top.isNotEmpty)
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 10,
+            children: top,
+          ),
+        ),
+      if (settings.bigPcCards)
+        SizedBox(
+          height: 150,
+          child: Row(
+            spacing: 10,
+            children: [
+              for (final (stat, label) in [
+                ('cpuLoad', 'CPU'),
+                ('gpuLoad', 'GPU'),
+                ('ramLoad', 'RAM'),
+                ('fps', 'FPS'),
+              ])
+                Expanded(
+                  child: StatTile(
+                    label: label,
+                    action: StatAction(stat, 'gauge'),
+                    value: _stats[stat],
+                    maximum: statMaximum(stat),
+                    history: const [],
+                    color: statColor(stat),
+                  ),
+                ),
+            ],
+          ),
+        ),
+    ];
+    if (rows.isEmpty) return null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 10,
+      children: rows,
     );
   }
 }
@@ -363,15 +509,18 @@ class _PcCard extends StatelessWidget {
             children: [
               Text(
                 time,
-                style: const TextStyle(
-                  color: DeckLook.text,
+                style: TextStyle(
+                  color: DeckLook.of(context).text,
                   fontSize: 32,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
                 '${_days[now.weekday - 1]} ${now.day} ${_months[now.month - 1]}',
-                style: const TextStyle(color: DeckLook.muted, fontSize: 12),
+                style: TextStyle(
+                  color: DeckLook.of(context).muted,
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 10),
               Row(
@@ -380,15 +529,17 @@ class _PcCard extends StatelessWidget {
                   Icon(
                     Icons.circle,
                     size: 8,
-                    color: pc == null ? DeckLook.muted : deckColors['green'],
+                    color: pc == null
+                        ? DeckLook.of(context).muted
+                        : deckColors['green'],
                   ),
                   Expanded(
                     child: Text(
                       pc ?? 'Not connected',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: DeckLook.text,
+                      style: TextStyle(
+                        color: DeckLook.of(context).text,
                         fontSize: 12,
                       ),
                     ),
@@ -413,7 +564,10 @@ class _PcCard extends StatelessWidget {
                         ),
                     ],
                   ),
-                  style: const TextStyle(color: DeckLook.muted, fontSize: 12),
+                  style: TextStyle(
+                    color: DeckLook.of(context).muted,
+                    fontSize: 12,
+                  ),
                 ),
             ],
           ),

@@ -1,17 +1,106 @@
 import 'package:deskpilot/deck.dart';
 import 'package:flutter/material.dart';
 
-/// DeskPilot's dark look: a near black screen, slightly lighter cards, and
-/// one bright color per kind of thing.
-abstract final class DeckLook {
-  static const background = Color(0xFF0B0D12);
-  static const rail = Color(0xFF0F1218);
-  static const card = Color(0xFF161A22);
-  static const cardBorder = Color(0xFF222736);
-  static const text = Color(0xFFEDEFF5);
-  static const muted = Color(0xFF8A90A2);
-  static const radius = 16.0;
+/// DeskPilot's look: a dark screen, slightly lighter cards, one accent
+/// color, and how round and far apart things are. Read it with [of]; the
+/// themes in [deckLooks] are picked in settings.
+@immutable
+class DeckLook extends ThemeExtension<DeckLook> {
+  const DeckLook({
+    required this.name,
+    required this.background,
+    required this.rail,
+    required this.card,
+    required this.cardBorder,
+    required this.text,
+    required this.muted,
+    required this.accent,
+    this.radius = 16,
+    this.gap = 10,
+  });
+
+  final String name;
+  final Color background;
+  final Color rail;
+  final Color card;
+  final Color cardBorder;
+  final Color text;
+  final Color muted;
+  final Color accent;
+  final double radius;
+  final double gap;
+
+  static DeckLook of(BuildContext context) =>
+      Theme.of(context).extension<DeckLook>() ?? deckLooks['midnight']!;
+
+  @override
+  DeckLook copyWith({double? radius, double? gap}) => DeckLook(
+    name: name,
+    background: background,
+    rail: rail,
+    card: card,
+    cardBorder: cardBorder,
+    text: text,
+    muted: muted,
+    accent: accent,
+    radius: radius ?? this.radius,
+    gap: gap ?? this.gap,
+  );
+
+  @override
+  DeckLook lerp(DeckLook? other, double t) =>
+      other == null || t < 0.5 ? this : other;
 }
+
+/// The themes, by the name settings save.
+const deckLooks = {
+  'midnight': DeckLook(
+    name: 'Midnight',
+    background: Color(0xFF0B0D12),
+    rail: Color(0xFF0F1218),
+    card: Color(0xFF161A22),
+    cardBorder: Color(0xFF222736),
+    text: Color(0xFFEDEFF5),
+    muted: Color(0xFF8A90A2),
+    accent: Color(0xFF4C8DFF),
+  ),
+  'carbon': DeckLook(
+    name: 'Carbon',
+    background: Color(0xFF0D0D0D),
+    rail: Color(0xFF131313),
+    card: Color(0xFF1A1A1A),
+    cardBorder: Color(0xFF2A2A2A),
+    text: Color(0xFFF2F2F2),
+    muted: Color(0xFF999999),
+    accent: Color(0xFF2BD4B4),
+  ),
+  'neon': DeckLook(
+    name: 'Neon',
+    background: Color(0xFF0D0A16),
+    rail: Color(0xFF120E1F),
+    card: Color(0xFF1A1430),
+    cardBorder: Color(0xFF2C2350),
+    text: Color(0xFFF3EEFF),
+    muted: Color(0xFF9C92B8),
+    accent: Color(0xFFFF6FB1),
+  ),
+  'racing': DeckLook(
+    name: 'Racing red',
+    background: Color(0xFF0F0A0A),
+    rail: Color(0xFF160E0E),
+    card: Color(0xFF1F1414),
+    cardBorder: Color(0xFF3A2020),
+    text: Color(0xFFF5ECEC),
+    muted: Color(0xFFA89090),
+    accent: Color(0xFFFF5A5F),
+  ),
+};
+
+/// Gaps between buttons, by the name settings save.
+const deckSpacings = {'tight': 6.0, 'normal': 10.0, 'roomy': 16.0};
+
+/// How round corners are, by the name settings save.
+const deckCorners = {'square': 4.0, 'soft': 10.0, 'round': 16.0};
 
 /// The colors a button can have. The PC accepts the same names.
 const deckColors = {
@@ -133,29 +222,41 @@ IconData pageIcon(String name) {
   return Icons.grid_view_rounded;
 }
 
-final deckTheme = ThemeData(
-  brightness: Brightness.dark,
-  scaffoldBackgroundColor: DeckLook.background,
-  colorScheme: ColorScheme.fromSeed(
-    seedColor: deckColors['blue']!,
+/// The app's theme for a look, spacing and corners from settings.
+ThemeData deckTheme({
+  String theme = 'midnight',
+  String spacing = 'normal',
+  String corners = 'round',
+}) {
+  final look = (deckLooks[theme] ?? deckLooks['midnight']!).copyWith(
+    gap: deckSpacings[spacing],
+    radius: deckCorners[corners],
+  );
+  return ThemeData(
     brightness: Brightness.dark,
-    primary: deckColors['blue'],
-    surface: DeckLook.background,
-    onSurface: DeckLook.text,
-    surfaceContainerHighest: DeckLook.cardBorder,
-  ),
-  appBarTheme: const AppBarTheme(
-    backgroundColor: DeckLook.background,
-    surfaceTintColor: Colors.transparent,
-  ),
-  dialogTheme: const DialogThemeData(backgroundColor: DeckLook.card),
-  cardTheme: CardThemeData(
-    color: DeckLook.card,
-    elevation: 0,
-    margin: EdgeInsets.zero,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(DeckLook.radius),
-      side: const BorderSide(color: DeckLook.cardBorder),
+    scaffoldBackgroundColor: look.background,
+    extensions: [look],
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: look.accent,
+      brightness: Brightness.dark,
+      primary: look.accent,
+      surface: look.background,
+      onSurface: look.text,
+      surfaceContainerHighest: look.cardBorder,
     ),
-  ),
-);
+    appBarTheme: AppBarTheme(
+      backgroundColor: look.background,
+      surfaceTintColor: Colors.transparent,
+    ),
+    dialogTheme: DialogThemeData(backgroundColor: look.card),
+    cardTheme: CardThemeData(
+      color: look.card,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(look.radius),
+        side: BorderSide(color: look.cardBorder),
+      ),
+    ),
+  );
+}
