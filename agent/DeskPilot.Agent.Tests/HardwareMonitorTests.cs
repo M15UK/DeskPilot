@@ -37,6 +37,18 @@ public class HardwareMonitorTests
     [Fact]
     public void GpuSensorsAreNotTheCpu() => Assert.Null(CpuTemp(Machine("")));
 
+    // LibreHardwareMonitor 0.9.6 writes readings as text in the PC's number format, not as numbers.
+    [Theory]
+    [InlineData("61.3 °C")]
+    [InlineData("61,3 °C")]
+    [InlineData("61\u066B3 °C")]
+    public void ReadsVersion096TextReadings(string reading) => Assert.Equal(61.3, CpuTemp(Machine(
+        $$"""{"Text":"Core (Tctl/Tdie)","SensorId":"/amdcpu/0/temperature/2","Type":"Temperature","Value":"{{reading}}","RawValue":"{{reading}}","Children":[]}""")));
+
+    [Fact]
+    public void ReadingsThatAreNotNumbersAreSkipped() => Assert.Null(CpuTemp(Machine(
+        """{"Text":"Core (Tctl/Tdie)","SensorId":"/amdcpu/0/temperature/2","Type":"Temperature","Value":"-","RawValue":"-","Children":[]}""")));
+
     [Fact]
     public void WithoutLibreHardwareMonitorThereIsNoCpuTempAndOneHint()
     {

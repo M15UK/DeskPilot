@@ -175,7 +175,6 @@ folder (32 tests).
   type `forget` in the PC window.
 * Windows comes first. Mac and Linux get the PC app later, without the game features.
 * FPS and the Assetto Corsa dashboard will only work on Windows.
-* CPU temperature on Windows will need HWiNFO or LibreHardwareMonitor running in the background.
 * The iPhone app needs a paid Apple developer account to go on the App Store.
 
 ## Credits

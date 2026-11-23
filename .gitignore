@@ -1,3 +1,5 @@
 .DS_Store
 bin/
 obj/
+# graphify's local map of the code (graph.json, graph.html, cache)
+graphify-out/

@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace DeskPilot.Agent;
 
@@ -7,7 +9,7 @@ namespace DeskPilot.Agent;
 /// running with Options, Remote Web Server, Run turned on. The PC window says each time the situation changes:
 /// can't reach it, it shows no CPU temperature, or it works.
 /// </summary>
-public sealed class HardwareMonitor(Action<string> report, int port = HardwareMonitor.DefaultPort) : IDisposable
+public sealed partial class HardwareMonitor(Action<string> report, int port = HardwareMonitor.DefaultPort) : IDisposable
 {
     public const int DefaultPort = 8085;
     const string Working = "CPU temperature: reading it from LibreHardwareMonitor.";
@@ -94,11 +96,9 @@ public sealed class HardwareMonitor(Action<string> report, int port = HardwareMo
             && Text(node, "SensorId") is { } id
             && (id.StartsWith("/amdcpu/", StringComparison.Ordinal) || id.StartsWith("/intelcpu/", StringComparison.Ordinal))
             && Text(node, "Text") is { } name
-            && node.TryGetProperty("RawValue", out var raw)
-            && raw.ValueKind == JsonValueKind.Number
-            && raw.GetDouble() is > 0 and < 150)
+            && Celsius(node) is double celsius and > 0 and < 150)
         {
-            temperatures.Add((name, raw.GetDouble()));
+            temperatures.Add((name, celsius));
         }
         if (node.TryGetProperty("Children", out var children) && children.ValueKind == JsonValueKind.Array)
         {
@@ -111,4 +111,35 @@ public sealed class HardwareMonitor(Action<string> report, int port = HardwareMo
 
     static string? Text(JsonElement node, string name) =>
         node.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
+    /// <summary>
+    /// A sensor's reading. Newer LibreHardwareMonitor writes RawValue as a number; version 0.9.6 writes text in the
+    /// PC's number format, like "61.3 °C", "61,3 °C" or "61٫3 °C".
+    /// </summary>
+    static double? Celsius(JsonElement node)
+    {
+        foreach (var field in (string[])["RawValue", "Value"])
+        {
+            if (!node.TryGetProperty(field, out var value))
+            {
+                continue;
+            }
+            if (value.ValueKind == JsonValueKind.Number)
+            {
+                return value.GetDouble();
+            }
+            if (value.ValueKind == JsonValueKind.String && Reading().Match(value.GetString()!) is { Success: true } match)
+            {
+                var number = match.Groups["part"].Success
+                    ? $"{match.Groups["whole"].Value}.{match.Groups["part"].Value}"
+                    : match.Groups["whole"].Value;
+                return double.Parse(number, CultureInfo.InvariantCulture);
+            }
+        }
+        return null;
+    }
+
+    // [0-9], not \d, which also matches digits of other scripts that double.Parse can't read.
+    [GeneratedRegex(@"(?<whole>-?[0-9]+)(?:[.,٫](?<part>[0-9]+))?")]
+    private static partial Regex Reading();
 }
