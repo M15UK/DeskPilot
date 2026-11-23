@@ -65,7 +65,7 @@ Each phase ends with something working on your phone.
 3. **The deck (done):** button grid, pages, edit mode on the phone, actions (keys, macros, open app or website, media,
    volume).
 4. **PC stats (done, CPU temperature through LibreHardwareMonitor):** CPU, GPU and RAM usage, temperatures, FPS; widgets for a number tile, a gauge and a small chart.
-5. **Gaming:** Assetto Corsa dashboard, game button boxes that switch automatically, game launcher, Discord controls.
+5. **Gaming (Assetto Corsa dashboard done):** Assetto Corsa dashboard, game button boxes that switch automatically, game launcher, Discord controls.
 6. **iPhone:** iOS build; test on your own iPhone with a free Apple ID (installs last 7 days) or TestFlight
    ($99 a year Apple developer account). iPhone over USB through `usbmuxd`.
 7. **Mac and Linux agent:** keys, media, volume and stats. Game features stay Windows only.

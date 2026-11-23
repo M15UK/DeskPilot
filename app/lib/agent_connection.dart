@@ -150,6 +150,13 @@ final class StatsChanged extends AgentEvent {
   final Map<String, double> stats;
 }
 
+/// The sim racing dashboard, about 30 times a second while you drive.
+final class TelemetryChanged extends AgentEvent {
+  const TelemetryChanged(this.telemetry);
+
+  final Map<String, double> telemetry;
+}
+
 /// A message for the user, usually why something didn't work.
 final class PcSays extends AgentEvent {
   const PcSays(this.text);
@@ -174,11 +181,16 @@ AgentEvent readEvent(String message) {
       ),
     },
     {'type': 'stats', 'stats': final Map<String, Object?> stats} =>
-      StatsChanged({
-        for (final MapEntry(:key, :value) in stats.entries)
-          if (value is num) key: value.toDouble(),
-      }),
+      StatsChanged(_numbers(stats)),
+    {'type': 'telemetry', 'telemetry': final Map<String, Object?> telemetry} =>
+      TelemetryChanged(_numbers(telemetry)),
     {'type': 'error', 'message': final String text} => PcSays(text),
     _ => const PcSays('Unexpected message from the PC'),
   };
 }
+
+/// The readings in a message, skipping anything that isn't a number.
+Map<String, double> _numbers(Map<String, Object?> readings) => {
+  for (final MapEntry(:key, :value) in readings.entries)
+    if (value is num) key: value.toDouble(),
+};

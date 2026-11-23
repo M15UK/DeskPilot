@@ -217,4 +217,19 @@ void main() {
     expect(statMaximum('fps'), 240);
     expect(statMaximum('cpuLoad'), 100);
   });
+
+  test('sim racing readings read like a race dash', () {
+    expect(formatStat('gear', -1), 'R');
+    expect(formatStat('gear', 0), 'N');
+    expect(formatStat('gear', 3), '3');
+    expect(formatStat('bestLap', 102.345), '1:42.345');
+    expect(formatStat('lapTime', 5.2), '0:05.200');
+    expect(formatStat('position', 2), 'P2');
+    expect(formatStat('fuel', 41.5), '41.5 L');
+    expect(formatStat('speed', 182.4), '182');
+    expect(formatStat('tyreFlTemp', 85), '85°C');
+    expect(statMaximum('rpm', {'rpmMax': 8500}), 8500);
+    expect(statMaximum('rpm'), 9000);
+    expect(statMaximum('fuel', {'fuelMax': 65}), 65);
+  });
 }

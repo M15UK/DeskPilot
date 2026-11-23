@@ -66,6 +66,17 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
         new DeckButton("gpu-temp", "GPU temperature", new StatAction("gpuTemp", "number")),
         new DeckButton("ram-load", "RAM", new StatAction("ramLoad", "gauge")),
         new DeckButton("cpu-chart", "CPU last minute", new StatAction("cpuLoad", "chart")),
+    ]), new DeckPage("Racing",
+    [
+        new DeckButton("sim-gear", "Gear", new StatAction("gear", "number")),
+        new DeckButton("sim-speed", "Speed km/h", new StatAction("speed", "number")),
+        new DeckButton("sim-rpm", "RPM", new StatAction("rpm", "gauge")),
+        new DeckButton("sim-lap-time", "Lap time", new StatAction("lapTime", "number")),
+        new DeckButton("sim-best-lap", "Best lap", new StatAction("bestLap", "number")),
+        new DeckButton("sim-position", "Position", new StatAction("position", "number")),
+        new DeckButton("sim-fuel", "Fuel", new StatAction("fuel", "gauge")),
+        new DeckButton("sim-tyre-fl", "Front left tyre", new StatAction("tyreFlTemp", "number")),
+        new DeckButton("sim-tyre-fr", "Front right tyre", new StatAction("tyreFrTemp", "number")),
     ])]);
 
     /// <summary>Reads and checks a deck. Returns null and says why when DeskPilot can't use it.</summary>
@@ -132,7 +143,8 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
         KeysAction keys => keys.Combos.Count is > 0 and <= MaxCombos
             && keys.Combos.All(combo => combo is not null && KeyCombo.Parse(combo) is not null),
         OpenAction open => !string.IsNullOrWhiteSpace(open.Target) && open.Target.Length <= MaxTargetLength,
-        StatAction stat => PcStats.Names.Contains(stat.Stat) && StatAction.Styles.Contains(stat.Style),
+        StatAction stat => (PcStats.Names.Contains(stat.Stat) || SimTelemetry.Names.Contains(stat.Stat))
+            && StatAction.Styles.Contains(stat.Style),
         _ => false,
     };
 }

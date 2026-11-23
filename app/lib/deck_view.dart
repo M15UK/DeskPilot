@@ -71,6 +71,7 @@ class DeckView extends StatelessWidget {
         label: button.label,
         action: stat,
         value: stats[stat.stat],
+        maximum: statMaximum(stat.stat, stats),
         history: history[stat.stat] ?? const [],
         onTap: editing ? () => _editButton(context, button) : null,
       );
@@ -495,22 +496,47 @@ const statHistoryLength = 60;
 
 /// How a reading looks on a tile: 41°C, 24%, or a dash when the PC can't
 /// tell.
-String formatStat(String stat, double? value) => switch (value) {
-  null => '—',
-  final value when stat == 'fps' => '${value.round()}',
-  final value when stat.endsWith('Temp') => '${value.round()}°C',
-  final value => '${value.round()}%',
+String formatStat(String stat, double? value) => switch ((stat, value)) {
+  (_, null) => '—',
+  ('gear', final double gear) =>
+    gear < 0 ? 'R' : (gear == 0 ? 'N' : '${gear.round()}'),
+  ('lapTime' || 'lastLap' || 'bestLap', final double seconds) => _lapTime(
+    seconds,
+  ),
+  ('position', final double position) => 'P${position.round()}',
+  ('fuel', final double litres) => '${litres.toStringAsFixed(1)} L',
+  (final name, final double value) when name.endsWith('Temp') =>
+    '${value.round()}°C',
+  (final name, final double value) when name.endsWith('Load') =>
+    '${value.round()}%',
+  (_, final double value) => '${value.round()}',
 };
 
-/// The reading that fills a gauge or reaches the top of a chart. Percent and
-/// °C use 100.
-double statMaximum(String stat) => stat == 'fps' ? 240 : 100;
+/// A lap time like a race dash shows it: 1:42.345.
+String _lapTime(double seconds) {
+  final milliseconds = (seconds * 1000).round();
+  final rest = (milliseconds % 60000) / 1000;
+  return '${milliseconds ~/ 60000}:${rest.toStringAsFixed(3).padLeft(6, '0')}';
+}
+
+/// The reading that fills a gauge or reaches the top of a chart. RPM and fuel
+/// use the car's own rev limit and tank from [stats]; percent and °C use 100.
+double statMaximum(String stat, [Map<String, double> stats = const {}]) =>
+    switch (stat) {
+      'fps' => 240,
+      'rpm' => stats['rpmMax'] ?? 9000,
+      'fuel' => stats['fuelMax'] ?? 100,
+      'speed' => 300,
+      _ when stat.startsWith('tyre') => 120,
+      _ => 100,
+    };
 
 class _StatTile extends StatelessWidget {
   const _StatTile({
     required this.label,
     required this.action,
     required this.value,
+    required this.maximum,
     required this.history,
     required this.onTap,
   });
@@ -518,6 +544,7 @@ class _StatTile extends StatelessWidget {
   final String label;
   final StatAction action;
   final double? value;
+  final double maximum;
   final List<double> history;
   final VoidCallback? onTap;
 
@@ -546,8 +573,7 @@ class _StatTile extends StatelessWidget {
                       AspectRatio(
                         aspectRatio: 1,
                         child: CircularProgressIndicator(
-                          value: ((value ?? 0) / statMaximum(action.stat))
-                              .clamp(0.0, 1.0),
+                          value: ((value ?? 0) / maximum).clamp(0.0, 1.0),
                           strokeWidth: 8,
                           backgroundColor:
                               theme.colorScheme.surfaceContainerHighest,
@@ -562,7 +588,7 @@ class _StatTile extends StatelessWidget {
                         child: CustomPaint(
                           painter: _ChartPainter(
                             history,
-                            statMaximum(action.stat),
+                            maximum,
                             theme.colorScheme.primary,
                           ),
                         ),

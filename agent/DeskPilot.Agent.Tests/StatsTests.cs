@@ -14,7 +14,7 @@ public class StatsTests
     public void TheFeedReadsOnlyWhileAPhoneListens()
     {
         var reads = 0;
-        var feed = new StatsFeed(() =>
+        var feed = new Feed<PcStats>(TimeSpan.FromSeconds(1), () =>
         {
             reads++;
             return PcStats.Unknown;

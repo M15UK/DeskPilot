@@ -8,7 +8,12 @@ namespace DeskPilot.Agent;
 public sealed record AgentSecurity(X509Certificate2 Certificate, PairingCodes Codes, PairedPhones Phones);
 
 /// <summary>Everything a phone's session works with.</summary>
-public sealed record AgentServices(AgentSecurity Security, DeckStore Decks, StatsFeed Stats, Func<ButtonAction, Task> Run);
+public sealed record AgentServices(
+    AgentSecurity Security,
+    DeckStore Decks,
+    Feed<PcStats> Stats,
+    Feed<SimTelemetry> Telemetry,
+    Func<ButtonAction, Task> Run);
 
 /// <summary>The result of a phone's first message: whether it may stay, and what to send it.</summary>
 public sealed record SignInResult(bool Allowed, IReadOnlyList<string> Replies);
@@ -19,7 +24,7 @@ public static class AgentServer
     public const int DefaultPort = 8740;
     public const int MaxSignInBytes = 4096;
     public const int MaxMessageBytes = 1024 * 1024;
-    public const int ProtocolVersion = 4;
+    public const int ProtocolVersion = 5;
 
     public static WebApplication Create(int port, AgentServices services)
     {
@@ -104,6 +109,9 @@ public static class AgentServer
 
     public static string StatsMessage(PcStats stats) =>
         JsonSerializer.Serialize(new { type = "stats", stats }, PcStats.Json);
+
+    public static string TelemetryMessage(SimTelemetry telemetry) =>
+        JsonSerializer.Serialize(new { type = "telemetry", telemetry }, PcStats.Json);
 
     internal static string Error(string message) => JsonSerializer.Serialize(new { type = "error", message });
 

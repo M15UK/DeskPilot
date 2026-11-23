@@ -4,8 +4,8 @@
 [![PC app](https://github.com/M15UK/DeskPilot/actions/workflows/agent.yml/badge.svg)](https://github.com/M15UK/DeskPilot/actions/workflows/agent.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Status: step 4 of 8 is done. Your phone shows a deck of buttons you set up yourself, plus live CPU,
-GPU and RAM load, temperatures and FPS. Follow along in the [build plan](docs/PLAN.md).**
+**Status: step 5 of 8 is under way. Your phone shows a deck of buttons you set up yourself, live PC
+stats with FPS, and a live Assetto Corsa dashboard. Follow along in the [build plan](docs/PLAN.md).**
 
 DeskPilot turns your phone into a control deck for your gaming PC. Tap buttons to control music,
 Discord and your games, and see live PC stats like temperature and FPS. It is made for gamers and
@@ -116,6 +116,9 @@ Tap the pencil at the top. Then:
   * **Open:** an app, file, folder or website, like `C:\Games\game.exe` or `steam://rungameid/244210`.
   * **Stat:** a live reading of CPU or GPU load, RAM, CPU or GPU temperature, or the FPS of the game in
     front, shown as a number, a gauge or a chart of the last minute.
+  * **Stat** with a **Sim** reading: while you drive in Assetto Corsa, your speed, RPM, gear, lap
+    times, position, fuel and tyre temperatures, updated 30 times a second. The RPM gauge fills to your
+    car's rev limit. Put them on a page of their own for a race dash.
 * Tap a button to change it, move it, or delete it.
 * Use **Add page** and **Page settings** to make pages, like one for music and one per game.
 
@@ -158,8 +161,8 @@ If a tile stays empty, the DeskPilot window says why. Two checks help:
 
 Until a tool is ready, its tile shows a dash and the DeskPilot window says what is missing.
 
-To run the tests, use `dotnet test agent/DeskPilot.slnx` (73 tests) and `flutter test` in the app
-folder (32 tests).
+To run the tests, use `dotnet test agent/DeskPilot.slnx` (92 tests) and `flutter test` in the app
+folder (33 tests).
 
 ## Limits
 
@@ -174,7 +177,8 @@ folder (32 tests).
 * **Forget this PC** in the app only removes the PC from your phone. To lock a phone out of your PC,
   type `forget` in the PC window.
 * Windows comes first. Mac and Linux get the PC app later, without the game features.
-* FPS and the Assetto Corsa dashboard will only work on Windows.
+* FPS and the Assetto Corsa dashboard work on Windows only. The dashboard shows dashes in menus and
+  replays, and while the game is paused.
 * The iPhone app needs a paid Apple developer account to go on the App Store.
 
 ## Credits

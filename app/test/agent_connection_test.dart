@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_pc.dart';
 
-const hello = {'type': 'hello', 'name': 'GAMING-PC', 'version': 4};
+const hello = {'type': 'hello', 'name': 'GAMING-PC', 'version': 5};
 
 void main() {
   FakePc? pc;
@@ -160,6 +160,16 @@ void main() {
       isA<StatsChanged>().having((e) => e.stats, 'stats', {
         'cpuLoad': 12.5,
         'gpuTemp': 41.0,
+      }),
+    );
+    expect(
+      readEvent(
+        '{"type":"telemetry","telemetry":{"rpm":7350,"gear":3,"bestLap":102.345}}',
+      ),
+      isA<TelemetryChanged>().having((e) => e.telemetry, 'telemetry', {
+        'rpm': 7350.0,
+        'gear': 3.0,
+        'bestLap': 102.345,
       }),
     );
     expect(

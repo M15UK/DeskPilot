@@ -25,23 +25,26 @@ public sealed record PcStats(
     };
 }
 
-/// <summary>Reads the PC's stats once a second while a phone is listening, and hands them to every connected phone.</summary>
-public sealed class StatsFeed(Func<PcStats> read)
+/// <summary>
+/// Reads something every <paramref name="interval"/> while a phone is listening, and hands it to every connected
+/// phone: PC stats once a second, sim telemetry about 30 times a second. A null reading is not sent.
+/// </summary>
+public sealed class Feed<T>(TimeSpan interval, Func<T?> read) where T : class
 {
-    static readonly TimeSpan Interval = TimeSpan.FromSeconds(1);
+    public event Action<T>? Updated;
 
-    public event Action<PcStats>? Updated;
-
-    /// <summary>Reads and hands out one set of stats, but only when a phone is listening.</summary>
+    /// <summary>Reads and hands out one reading, but only when a phone is listening.</summary>
     public void Tick()
     {
-        var listeners = Updated;
-        listeners?.Invoke(read());
+        if (Updated is { } listeners && read() is { } reading)
+        {
+            listeners(reading);
+        }
     }
 
     public async Task RunAsync(ILogger logger, CancellationToken stop)
     {
-        using var timer = new PeriodicTimer(Interval);
+        using var timer = new PeriodicTimer(interval);
         while (await timer.WaitForNextTickAsync(stop))
         {
             try

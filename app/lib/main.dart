@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 
 void main() => runApp(const DeskPilotApp());
 
+const _telemetryTimeout = Duration(seconds: 2);
+
 class DeskPilotApp extends StatelessWidget {
   const DeskPilotApp({super.key, this.store = const PcStore()});
 
@@ -40,6 +42,8 @@ class _DeckPageState extends State<DeckPage> {
   AgentConnection? _agent;
   Deck? _deck;
   Map<String, double> _stats = const {};
+  Map<String, double> _telemetry = const {};
+  DateTime _telemetryAt = DateTime(0);
   Map<String, List<double>> _history = const {};
   int _page = 0;
   bool _editing = false;
@@ -130,8 +134,15 @@ class _DeckPageState extends State<DeckPage> {
         case DeckChanged(:final deck):
           _deck = deck;
         case StatsChanged(:final stats):
+          // Telemetry stops when you leave the track; don't keep showing the last lap.
+          if (DateTime.now().difference(_telemetryAt) > _telemetryTimeout) {
+            _telemetry = const {};
+          }
           _stats = stats;
-          _history = _withReadings(_history, stats);
+          _history = _withReadings(_history, {...stats, ..._telemetry});
+        case TelemetryChanged(:final telemetry):
+          _telemetry = telemetry;
+          _telemetryAt = DateTime.now();
         case PcSays(:final text):
           _status = text;
       }
@@ -155,6 +166,7 @@ class _DeckPageState extends State<DeckPage> {
       _saved = null;
       _deck = null;
       _stats = const {};
+      _telemetry = const {};
       _history = const {};
       _page = 0;
       _editing = false;
@@ -174,6 +186,7 @@ class _DeckPageState extends State<DeckPage> {
     setState(() {
       _agent = null;
       _stats = const {};
+      _telemetry = const {};
       _status = 'Lost the connection to ${agent.pcName}';
     });
   }
@@ -270,7 +283,7 @@ class _DeckPageState extends State<DeckPage> {
                   onPress: agent?.press,
                   onChange: _save,
                   onPageChanged: (page) => setState(() => _page = page),
-                  stats: _stats,
+                  stats: {..._stats, ..._telemetry},
                   history: _history,
                 ),
         ),

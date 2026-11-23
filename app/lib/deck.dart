@@ -18,6 +18,19 @@ const statNames = {
   'ramLoad': 'RAM used',
   'cpuTemp': 'CPU temperature',
   'fps': 'FPS of the game in front',
+  'speed': 'Sim: speed (km/h)',
+  'rpm': 'Sim: RPM',
+  'gear': 'Sim: gear',
+  'fuel': 'Sim: fuel',
+  'lap': 'Sim: lap',
+  'position': 'Sim: position',
+  'lapTime': 'Sim: lap time',
+  'lastLap': 'Sim: last lap',
+  'bestLap': 'Sim: best lap',
+  'tyreFlTemp': 'Sim: front left tyre',
+  'tyreFrTemp': 'Sim: front right tyre',
+  'tyreRlTemp': 'Sim: rear left tyre',
+  'tyreRrTemp': 'Sim: rear right tyre',
 };
 
 /// How a stat tile shows its reading.

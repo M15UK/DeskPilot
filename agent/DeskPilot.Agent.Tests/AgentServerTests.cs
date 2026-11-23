@@ -92,7 +92,9 @@ public class ServerTests : IAsyncLifetime
     readonly TempFolder folder = new();
     AgentSecurity security = null!;
     DeckStore decks = null!;
-    StatsFeed stats = null!;
+    Feed<PcStats> stats = null!;
+    Feed<SimTelemetry> telemetry = null!;
+    SimTelemetry? car;
     WebApplication app = null!;
     Uri uri = null!;
 
@@ -103,8 +105,9 @@ public class ServerTests : IAsyncLifetime
             new PairingCodes(TimeProvider.System),
             new PairedPhones(Path.Combine(folder.Path, "phones.json")));
         decks = new DeckStore(Path.Combine(folder.Path, "deck.json"));
-        stats = new StatsFeed(() => new PcStats(CpuLoad: 50, GpuLoad: null, GpuTemp: null, RamLoad: 40));
-        app = AgentServer.Create(port: 0, new AgentServices(security, decks, stats, action =>
+        stats = new Feed<PcStats>(TimeSpan.FromSeconds(1), () => new PcStats(CpuLoad: 50, GpuLoad: null, GpuTemp: null, RamLoad: 40));
+        telemetry = new Feed<SimTelemetry>(TimeSpan.FromMilliseconds(33), () => car);
+        app = AgentServer.Create(port: 0, new AgentServices(security, decks, stats, telemetry, action =>
         {
             ran.Writer.TryWrite(action);
             return Task.CompletedTask;
@@ -134,7 +137,7 @@ public class ServerTests : IAsyncLifetime
             using var hello = await ReceiveJsonAsync(phone);
             Assert.Equal("hello", Type(hello));
             Assert.Equal(Environment.MachineName, hello.RootElement.GetProperty("name").GetString());
-            Assert.Equal(4, hello.RootElement.GetProperty("version").GetInt32());
+            Assert.Equal(5, hello.RootElement.GetProperty("version").GetInt32());
             using var deck = await ReceiveJsonAsync(phone);
             Assert.Equal("deck", Type(deck));
         }
@@ -178,6 +181,22 @@ public class ServerTests : IAsyncLifetime
         Assert.Equal("stats", Type(update));
         Assert.Equal(50, update.RootElement.GetProperty("stats").GetProperty("cpuLoad").GetDouble());
         Assert.False(update.RootElement.GetProperty("stats").TryGetProperty("gpuLoad", out _));
+    }
+
+    [Fact]
+    public async Task ASignedInPhoneGetsTelemetryOnlyWhileDriving()
+    {
+        using var phone = await SignedInPhoneAsync();
+
+        telemetry.Tick(); // not driving: nothing is sent
+        car = new SimTelemetry(Speed: 182, Rpm: 7350, RpmMax: 8500, Gear: 3, Fuel: 41.5, FuelMax: 65, Lap: 5,
+            Position: 2, LapTime: 31.25, LastLap: 103.9, BestLap: null, TyreFlTemp: 85, TyreFrTemp: 87,
+            TyreRlTemp: 79, TyreRrTemp: 80);
+        telemetry.Tick();
+        using var update = await ReceiveJsonAsync(phone);
+
+        Assert.Equal("telemetry", Type(update));
+        Assert.Equal(7350, update.RootElement.GetProperty("telemetry").GetProperty("rpm").GetDouble());
     }
 
     [Theory]

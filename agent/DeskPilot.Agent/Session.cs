@@ -15,6 +15,8 @@ sealed class Session(WebSocket socket, AgentServices services, ILogger logger, C
     readonly byte[] buffer = new byte[AgentServer.MaxMessageBytes];
     // A WebSocket allows one send at a time, and deck changes and stats arrive while the phone is talking.
     readonly SemaphoreSlim sendLock = new(1, 1);
+    // Telemetry arrives 30 times a second; on a slow link, drop a reading rather than queue them up.
+    int sendingTelemetry;
 
     public async Task RunAsync(IPAddress? address)
     {
@@ -43,6 +45,7 @@ sealed class Session(WebSocket socket, AgentServices services, ILogger logger, C
         logger.LogInformation("Phone connected from {Address}", address);
         services.Decks.Changed += OnDeckChanged;
         services.Stats.Updated += OnStats;
+        services.Telemetry.Updated += OnTelemetry;
         try
         {
             await SendAsync(AgentServer.DeckMessage(services.Decks.Current));
@@ -56,6 +59,7 @@ sealed class Session(WebSocket socket, AgentServices services, ILogger logger, C
         }
         finally
         {
+            services.Telemetry.Updated -= OnTelemetry;
             services.Stats.Updated -= OnStats;
             services.Decks.Changed -= OnDeckChanged;
             logger.LogInformation("Phone disconnected");
@@ -65,6 +69,27 @@ sealed class Session(WebSocket socket, AgentServices services, ILogger logger, C
     void OnDeckChanged(Deck deck) => _ = SendQuietlyAsync(AgentServer.DeckMessage(deck));
 
     void OnStats(PcStats stats) => _ = SendQuietlyAsync(AgentServer.StatsMessage(stats));
+
+    void OnTelemetry(SimTelemetry telemetry)
+    {
+        if (Interlocked.Exchange(ref sendingTelemetry, 1) == 1)
+        {
+            return;
+        }
+        _ = SendTelemetryAsync(AgentServer.TelemetryMessage(telemetry));
+    }
+
+    async Task SendTelemetryAsync(string json)
+    {
+        try
+        {
+            await SendQuietlyAsync(json);
+        }
+        finally
+        {
+            Volatile.Write(ref sendingTelemetry, 0);
+        }
+    }
 
     async Task SendQuietlyAsync(string json)
     {
