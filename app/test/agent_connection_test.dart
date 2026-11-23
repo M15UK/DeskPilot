@@ -1,46 +1,105 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:deskpilot/agent_connection.dart';
+import 'package:deskpilot/pairing.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'fake_pc.dart';
+
+const hello = {'type': 'hello', 'name': 'GAMING-PC', 'version': 2};
+
 void main() {
-  test('shows the PC name, then sends Play/Pause to the PC', () async {
-    final pc = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    addTearDown(() => pc.close(force: true));
-    final received = Completer<String>();
-    pc.listen((request) async {
-      final socket = await WebSocketTransformer.upgrade(request);
-      socket.add(
-        jsonEncode({'type': 'hello', 'name': 'GAMING-PC', 'version': 1}),
-      );
-      socket.listen((message) => received.complete(message as String));
-    });
+  FakePc? pc;
+  tearDown(() => pc?.stop());
 
-    final agent = await AgentConnection.connect('127.0.0.1', port: pc.port);
+  PcInfo infoFor(FakePc pc, {String? fingerprint}) => PcInfo(
+    name: 'GAMING-PC',
+    hosts: const ['127.0.0.1'],
+    port: pc.port,
+    fingerprint: fingerprint ?? pc.fingerprint,
+  );
+
+  test('pairs with the QR code and keeps the new key', () async {
+    final fake = pc = await FakePc.start(
+      (_) => [
+        {'type': 'paired', 'key': 'new-key'},
+        hello,
+      ],
+    );
+
+    final agent = await AgentConnection.pair((
+      pc: infoFor(fake),
+      code: 'code123',
+    ));
     addTearDown(agent.close);
-    final firstStatus = Completer<String>();
-    agent.statuses.listen((status) {
-      if (!firstStatus.isCompleted) firstStatus.complete(status);
-    });
 
-    expect(await firstStatus.future, 'Connected to GAMING-PC');
+    expect(agent.key, 'new-key');
+    expect(agent.pcName, 'GAMING-PC');
+    expect(await fake.nextMessage(), {'type': 'pair', 'code': 'code123'});
     agent.playPause();
-    expect(jsonDecode(await received.future), {
-      'type': 'media',
-      'action': 'playPause',
-    });
+    expect(await fake.nextMessage(), {'type': 'media', 'action': 'playPause'});
   });
 
-  test('connecting to a PC that is not running fails', () async {
+  test('signs in with the saved key', () async {
+    final fake = pc = await FakePc.start((_) => [hello]);
+
+    final agent = await AgentConnection.signIn((
+      pc: infoFor(fake),
+      key: 'saved-key',
+    ));
+    addTearDown(agent.close);
+
+    expect(agent.key, 'saved-key');
+    expect(await fake.nextMessage(), {'type': 'auth', 'key': 'saved-key'});
+  });
+
+  test('shows why the PC refused', () async {
+    const why = 'This phone is not paired with this PC. Pair it again.';
+    final fake = pc = await FakePc.start(
+      (_) => [
+        {'type': 'error', 'message': why},
+      ],
+    );
+
+    await expectLater(
+      AgentConnection.signIn((pc: infoFor(fake), key: 'old-key')),
+      throwsA(isA<AgentRefused>().having((e) => e.message, 'message', why)),
+    );
+  });
+
+  test('never talks to a PC with a different certificate', () async {
+    final fake = pc = await FakePc.start((_) => [hello]);
+
+    await expectLater(
+      AgentConnection.signIn((
+        pc: infoFor(fake, fingerprint: '0' * 64),
+        key: 'saved-key',
+      )),
+      throwsA(isA<AgentRefused>()),
+    );
+    expect(fake.receivedCount, 0);
+  });
+
+  test('a PC that is not running gives a clear error', () async {
     final unused = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
     final port = unused.port;
     await unused.close();
+    final pc = PcInfo(
+      name: 'GAMING-PC',
+      hosts: const ['127.0.0.1'],
+      port: port,
+      fingerprint: '0' * 64,
+    );
 
     await expectLater(
-      AgentConnection.connect('127.0.0.1', port: port),
-      throwsA(isA<Exception>()),
+      AgentConnection.signIn((pc: pc, key: 'saved-key')),
+      throwsA(
+        isA<AgentRefused>().having(
+          (e) => e.message,
+          'message',
+          contains("Couldn't reach GAMING-PC"),
+        ),
+      ),
     );
   });
 

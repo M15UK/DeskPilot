@@ -54,41 +54,81 @@ public class HandleTests
 public class ServerTests : IAsyncLifetime
 {
     readonly TaskCompletionSource playPause = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    readonly TempFolder folder = new();
+    AgentSecurity security = null!;
     WebApplication app = null!;
     Uri uri = null!;
 
     public async Task InitializeAsync()
     {
-        app = AgentServer.Create(port: 0, () => playPause.TrySetResult());
+        security = new AgentSecurity(
+            AgentCertificate.LoadOrCreate(folder.Path),
+            new PairingCodes(TimeProvider.System),
+            new PairedPhones(Path.Combine(folder.Path, "phones.json")));
+        app = AgentServer.Create(port: 0, security, () => playPause.TrySetResult());
         await app.StartAsync();
         var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
-        uri = new Uri($"ws://127.0.0.1:{new Uri(address).Port}/ws");
+        uri = new Uri($"wss://127.0.0.1:{new Uri(address).Port}/ws");
     }
 
-    public async Task DisposeAsync() => await app.DisposeAsync();
+    public async Task DisposeAsync()
+    {
+        await app.DisposeAsync();
+        security.Certificate.Dispose();
+        folder.Dispose();
+    }
 
     [Fact]
-    public async Task PhoneGetsHelloThenPlayPauseReachesThePc()
+    public async Task APairedPhoneSignsInWithItsKeyAndCanPlayPause()
     {
-        using var phone = new ClientWebSocket();
-        await phone.ConnectAsync(uri, Timeout());
+        string key;
+        using (var phone = await ConnectAsync())
+        {
+            await SendAsync(phone, new { type = "pair", code = security.Codes.New() });
+            using var paired = await ReceiveJsonAsync(phone);
+            Assert.Equal("paired", Type(paired));
+            key = paired.RootElement.GetProperty("key").GetString()!;
+            using var hello = await ReceiveJsonAsync(phone);
+            Assert.Equal("hello", Type(hello));
+            Assert.Equal(Environment.MachineName, hello.RootElement.GetProperty("name").GetString());
+            Assert.Equal(2, hello.RootElement.GetProperty("version").GetInt32());
+        }
+        Assert.Equal(1, security.Phones.Count);
 
-        using var hello = JsonDocument.Parse(await ReceiveText(phone));
-        Assert.Equal("hello", hello.RootElement.GetProperty("type").GetString());
-        Assert.Equal(Environment.MachineName, hello.RootElement.GetProperty("name").GetString());
-        Assert.Equal(1, hello.RootElement.GetProperty("version").GetInt32());
-
-        await phone.SendAsync(Encoding.UTF8.GetBytes("""{"type":"media","action":"playPause"}"""),
-            WebSocketMessageType.Text, endOfMessage: true, Timeout());
+        using var later = await ConnectAsync();
+        await SendAsync(later, new { type = "auth", key });
+        using var welcome = await ReceiveJsonAsync(later);
+        Assert.Equal("hello", Type(welcome));
+        await SendAsync(later, new { type = "media", action = "playPause" });
         await playPause.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Theory]
+    [InlineData("""{"type":"pair","code":"wrong"}""")]
+    [InlineData("""{"type":"auth","key":"unknown"}""")]
+    [InlineData("""{"type":"media","action":"playPause"}""")]
+    [InlineData("not json")]
+    public async Task StrangersAreRefusedAndDisconnected(string firstMessage)
+    {
+        security.Codes.New();
+        using var phone = await ConnectAsync();
+
+        await phone.SendAsync(Encoding.UTF8.GetBytes(firstMessage), WebSocketMessageType.Text,
+            endOfMessage: true, Timeout());
+        using var error = await ReceiveJsonAsync(phone);
+        var close = await phone.ReceiveAsync(new byte[256], Timeout());
+
+        Assert.Equal("error", Type(error));
+        Assert.Equal(WebSocketMessageType.Close, close.MessageType);
+        Assert.Equal(WebSocketCloseStatus.PolicyViolation, phone.CloseStatus);
+        Assert.False(playPause.Task.IsCompleted);
+        Assert.Equal(0, security.Phones.Count);
     }
 
     [Fact]
     public async Task OversizedMessageClosesTheConnection()
     {
-        using var phone = new ClientWebSocket();
-        await phone.ConnectAsync(uri, Timeout());
-        await ReceiveText(phone); // hello
+        using var phone = await ConnectAsync();
 
         await phone.SendAsync(new byte[AgentServer.MaxMessageBytes + 1], WebSocketMessageType.Text,
             endOfMessage: true, Timeout());
@@ -99,13 +139,30 @@ public class ServerTests : IAsyncLifetime
         Assert.False(playPause.Task.IsCompleted);
     }
 
-    static async Task<string> ReceiveText(WebSocket socket)
+    /// <summary>Connects like the phone app: trusting only the agent's own certificate.</summary>
+    async Task<ClientWebSocket> ConnectAsync()
+    {
+        var fingerprint = AgentCertificate.Fingerprint(security.Certificate);
+        var phone = new ClientWebSocket();
+        phone.Options.RemoteCertificateValidationCallback = (_, certificate, _, _) =>
+            certificate is not null && AgentCertificate.Fingerprint(certificate) == fingerprint;
+        await phone.ConnectAsync(uri, Timeout());
+        return phone;
+    }
+
+    static Task SendAsync(WebSocket socket, object message) =>
+        socket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(message), WebSocketMessageType.Text,
+            endOfMessage: true, Timeout());
+
+    static async Task<JsonDocument> ReceiveJsonAsync(WebSocket socket)
     {
         var buffer = new byte[4096];
         var result = await socket.ReceiveAsync(buffer, Timeout());
         Assert.Equal(WebSocketMessageType.Text, result.MessageType);
-        return Encoding.UTF8.GetString(buffer, 0, result.Count);
+        return JsonDocument.Parse(buffer.AsMemory(0, result.Count));
     }
+
+    static string? Type(JsonDocument message) => message.RootElement.GetProperty("type").GetString();
 
     static CancellationToken Timeout() => new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token;
 }

@@ -4,8 +4,8 @@
 [![PC app](https://github.com/M15UK/DeskPilot/actions/workflows/agent.yml/badge.svg)](https://github.com/M15UK/DeskPilot/actions/workflows/agent.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Status: step 1 of 8 is done. Your phone connects to your PC and can press Play/Pause. Follow along in
-the [build plan](docs/PLAN.md).**
+**Status: step 2 of 8 is done. Your phone pairs with your PC by QR code and presses Play/Pause over an
+encrypted connection. Follow along in the [build plan](docs/PLAN.md).**
 
 DeskPilot turns your phone into a control deck for your gaming PC. Tap buttons to control music,
 Discord and your games, and see live PC stats like temperature and FPS. It is made for gamers and
@@ -55,24 +55,65 @@ Flutter (one app for Android and iPhone) · C# and .NET (the PC app) · GitHub A
 
 ## Run it on your computer
 
-You need the .NET 11 SDK for the PC app, and Flutter 3.47 with an Android phone for the phone app.
+DeskPilot has two parts: the PC app on your Windows PC, and the phone app on your Android phone.
+Both need to be on the same home network.
 
-```bash
-dotnet run --project agent/DeskPilot.Agent   # starts the PC app and shows its addresses
-cd app && flutter run                         # installs the phone app on your connected phone
-```
+### On your Windows PC
 
-Type one of the addresses the PC app shows into the phone app, then tap Connect. Your phone and PC
-need to be on the same network. The first time, Windows Firewall asks about DeskPilot. Allow it on
-private networks.
+1. Open PowerShell: press the Windows key, type `PowerShell` and press Enter.
+2. Install the .NET 11 SDK and Git:
 
-To run the tests, use `dotnet test agent/DeskPilot.slnx` (10 tests) and `flutter test` in the app
-folder (5 tests).
+   ```powershell
+   winget install Microsoft.DotNet.SDK.11
+   winget install Git.Git
+   ```
+
+3. Close PowerShell and open it again, so it finds the new tools.
+4. Download DeskPilot and start the PC app:
+
+   ```powershell
+   git clone https://github.com/M15UK/DeskPilot.git
+   cd DeskPilot
+   dotnet run --project agent/DeskPilot.Agent
+   ```
+
+5. The first start takes about a minute. Then a QR code opens on your screen. It works once, for 5
+   minutes.
+6. If Windows Firewall asks about DeskPilot, tick **Private networks** and click **Allow**.
+
+Keep that window open while you use DeskPilot. In it, press Enter to show a new QR code for another
+phone, or type `forget` and press Enter to unpair every phone. To update later, run `git pull` in the
+DeskPilot folder, then the `dotnet run` line again.
+
+### On your Android phone
+
+There is no app download yet, so you install it from a computer that has Flutter 3.47.
+
+1. On the phone, open **Settings**, then **About phone**, and tap **Build number** seven times. This
+   turns on Developer options.
+2. Find **Developer options** in Settings (often under **System**) and turn on **USB debugging**.
+3. Plug the phone into the computer with a USB cable. When the phone asks, allow the computer.
+4. In the DeskPilot folder on that computer, install the app:
+
+   ```bash
+   cd app
+   flutter run
+   ```
+
+5. In the app, tap **Scan the QR code** and point the camera at the QR code on your PC. Play some
+   music on the PC, then tap **Play / Pause**.
+
+The app remembers your PC and connects by itself the next time you open it.
+
+To run the tests, use `dotnet test agent/DeskPilot.slnx` (27 tests) and `flutter test` in the app
+folder (13 tests).
 
 ## Limits
 
 * Play/Pause works on Windows only for now. On a Mac or Linux PC, the app tells you so.
-* There is no pairing yet, so anyone on your network could press Play/Pause. Step 2 fixes this.
+* If your PC's address on the network changes, scan a new QR code.
+* **Forget this PC** in the app only removes the PC from your phone. To lock a phone out of your PC,
+  type `forget` in the PC window.
 * Windows comes first. Mac and Linux get the PC app later, without the game features.
 * FPS and the Assetto Corsa dashboard will only work on Windows.
 * CPU temperature on Windows will need HWiNFO or LibreHardwareMonitor running in the background.

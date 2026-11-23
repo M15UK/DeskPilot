@@ -60,7 +60,7 @@ Each phase ends with something working on your phone.
 0. **Setup:** GitHub repo, MIT license, README, `.gitignore`, GitHub Actions that build the agent and the app.
 1. **First connection (done):** agent with a WebSocket server; the app connects by typing the PC's IP; one Play/Pause button
    works. This proves the whole path end to end.
-2. **Pairing and security:** QR pairing, TLS with the pinned certificate, the key kept in the phone's secure storage,
+2. **Pairing and security (done):** QR pairing, TLS with the pinned certificate, the key kept in the phone's secure storage,
    USB through `adb reverse`.
 3. **The deck:** button grid, pages, edit mode on the phone, actions (keys, macros, open app or website, media,
    volume).

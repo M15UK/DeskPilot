@@ -7,7 +7,9 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Deskpilot</string>
+	<string>DeskPilot</string>
+	<key>NSCameraUsageDescription</key>
+	<string>DeskPilot uses the camera to scan the QR code on your PC, so the two can pair.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
