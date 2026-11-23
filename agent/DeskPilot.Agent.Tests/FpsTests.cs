@@ -84,8 +84,10 @@ public class WindowsFpsTests
         Assert.True(reading is null or >= 0);
         if (OperatingSystem.IsWindows())
         {
-            // Starting works as administrator or in Performance Log Users. Anything else means a broken call.
-            Assert.True(hints.Count == 0 || hints[0].Contains("Performance Log Users"), string.Join(" ", hints));
+            // Listening, or missing the permission. A refused frame source or a Windows error means a broken call.
+            Assert.True(
+                hints.All(hint => hint.Contains("listening for frames") || hint.Contains("Performance Log Users")),
+                string.Join(" ", hints));
         }
         else
         {
