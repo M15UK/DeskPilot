@@ -124,27 +124,31 @@ buttons.
 
 ### CPU temperature and FPS
 
-Windows doesn't share these by itself, so DeskPilot reads them from two free tools. Do this once on
-your PC:
+Both need a one time setup on your PC.
 
-1. Install both in PowerShell:
+**FPS** comes with DeskPilot. It counts the frames Windows itself reports, without touching the game, so
+anti cheat isn't involved. Windows only allows this for users in the Performance Log Users group, so open
+PowerShell as administrator and run this, then sign out of Windows and back in:
+
+```powershell
+Add-LocalGroupMember -SID S-1-5-32-559 -Member $env:USERNAME
+```
+
+**CPU temperature** needs LibreHardwareMonitor, because reading it takes a driver that Windows doesn't
+have:
+
+1. Install it in PowerShell:
 
    ```powershell
    winget install LibreHardwareMonitor.LibreHardwareMonitor
-   winget install Intel.PresentMon.Console
    ```
 
-2. Open LibreHardwareMonitor and let it run as administrator. In its **Options** menu, turn on
-   **Remote Web Server**, then **Run**. Keep it open. **Start Minimized** and **Run On Windows Startup**
-   in the same menu help with that.
-3. Let PresentMon see your games. Open PowerShell as administrator and run:
+2. Open it and let it run as administrator. In its **Options** menu, turn on **Remote Web Server**, then
+   **Run**. **Start Minimized** and **Run On Windows Startup** keep it going.
+3. In its **Hardware** menu, untick everything except **CPU**. DeskPilot reads the GPU from Windows, so
+   this keeps LibreHardwareMonitor's work as small as possible.
 
-   ```powershell
-   Add-LocalGroupMember -Group "Performance Log Users" -Member $env:USERNAME
-   ```
-
-   Then sign out of Windows and back in.
-4. Start DeskPilot again, and add **Stat** tiles for CPU temperature and FPS.
+Then start DeskPilot again and add **Stat** tiles for CPU temperature and FPS.
 
 Until a tool is ready, its tile shows a dash and the DeskPilot window says what is missing.
 
@@ -154,7 +158,8 @@ folder (32 tests).
 ## Limits
 
 * Media and key buttons and the readings work on Windows only for now. Open buttons also work on a Mac.
-* CPU temperature needs LibreHardwareMonitor running, and FPS needs PresentMon. Both are free.
+* CPU temperature needs LibreHardwareMonitor running. FPS needs your Windows user in the Performance Log
+  Users group.
 * LibreHardwareMonitor's web server can be seen by other devices on your network, not just this PC.
 * Key buttons can't reach a game or app that runs as administrator, unless DeskPilot runs as
   administrator too.
@@ -173,6 +178,8 @@ folder (32 tests).
   reading PC stats. DeskPilot has its own code.
 * [DeskHub](https://github.com/zacharyinserra/deskhub) (MIT license) for the idea of a desk screen
   that runs things on your PC.
+* [PhoneBox Games Tab](https://github.com/lucasaz/phonebox-games-tab) (MIT license) for the idea of
+  counting frames from Windows' own events.
 * Not connected to Discord, Assetto Corsa, Steam or Epic Games.
 
 ## License

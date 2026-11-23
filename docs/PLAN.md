@@ -47,7 +47,7 @@ deskpilot/
 | Volume, per app | Core Audio (NAudio) | CoreAudio / PipeWire | |
 | CPU, GPU, RAM usage | performance counters, D3DKMT, `nvidia-smi` | sysctl / `/proc`, sysfs | PhoneBox uses the same sources |
 | Temperatures | GPU: `nvidia-smi` (AMD later). CPU: read from HWiNFO or LibreHardwareMonitor if running | SMC / hwmon | Reading CPU temps directly needs a kernel driver; we avoid shipping one |
-| FPS, frame time, 1% lows | Intel PresentMon (MIT) | not planned | Needs admin or the "Performance Log Users" group |
+| FPS | Windows' own frame events (ETW), built in | not planned | Needs admin or the "Performance Log Users" group |
 | Discord mute, deafen, join | Discord's local RPC with your own Discord app ID | same | Fallback: Discord keybinds as normal key buttons |
 | Assetto Corsa dashboard | shared memory `acpmf_physics`, `acpmf_graphics`, `acpmf_static` | not planned | ACC uses the same layout, so it comes almost free |
 | Game button boxes | per game button pages, switched by watching which game is running | same | Ships with an Assetto Corsa preset: pit, lights, wipers, cameras |
@@ -70,6 +70,11 @@ Each phase ends with something working on your phone.
    ($99 a year Apple developer account). iPhone over USB through `usbmuxd`.
 7. **Mac and Linux agent:** keys, media, volume and stats. Game features stay Windows only.
 8. **Release:** Windows installer, Mac `.dmg`, Linux package, APK on GitHub Releases, store listings later.
+   FPS is already built in (Windows' own frame events). The Windows installer bundles the LibreHardwareMonitor
+   library (MPL-2.0), so users download nothing else. CPU temperature and FPS stay off until the user turns
+   them on: one admin prompt then adds the user to Performance Log Users and installs a small helper
+   service with the PawnIO driver, while the main agent keeps running without admin. Before shipping: confirm PawnIO's redistribution terms (or download it from the official source
+   at that moment), check anti-cheat games accept PawnIO, and code sign the installer and helper.
 
 ## Testing
 
@@ -81,7 +86,7 @@ Each phase ends with something working on your phone.
 ## Risks
 
 - **Anti cheat:** we only send normal OS key presses and read data that games publish on purpose (Assetto Corsa's
-  shared memory, PresentMon). We never read or write another game's memory.
+  shared memory, Windows' own frame events). We never read or write another game's memory.
 - **CPU temperature on Windows** depends on HWiNFO or LibreHardwareMonitor running; without them the tile says
   "not available".
 - **Unsigned Windows builds** trigger SmartScreen warnings until we get code signing (PhoneBox uses SignPath's free
@@ -91,5 +96,5 @@ Each phase ends with something working on your phone.
 ## Setup checklist
 
 - Mac: Flutter 3.47, Xcode 16.2, Android SDK, GitHub CLI and .NET 11 SDK are installed.
-- Windows PC: .NET 11 SDK, Assetto Corsa, Discord desktop app, PresentMon (bundled later).
+- Windows PC: .NET 11 SDK, Assetto Corsa, Discord desktop app, LibreHardwareMonitor for CPU temperature.
 - Android phone: Developer options and USB debugging turned on, for USB and installing test builds.

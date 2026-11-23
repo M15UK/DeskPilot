@@ -15,7 +15,7 @@ var decks = new DeckStore(Path.Combine(folder, "deck.json"));
 
 using var statsReader = new StatsReader();
 using var hardwareMonitor = new HardwareMonitor(Console.WriteLine);
-using var fps = new PresentMonFps(Console.WriteLine);
+using var fps = new WindowsFps(Console.WriteLine);
 var stats = new StatsFeed(() =>
     statsReader.Read() with { CpuTemp = hardwareMonitor.CpuTemp(), Fps = fps.Read() });
 

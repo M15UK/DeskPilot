@@ -46,7 +46,7 @@ Messages can be up to 1 MB. A bigger one closes the connection with close code 1
 | PC to phone | When |
 | :-- | :-- |
 | `{"type":"deck","deck":{...}}` | Right after `hello`, and whenever any phone saves a deck. |
-| `{"type":"stats","stats":{"cpuLoad":23.5,"gpuLoad":41,"gpuTemp":62.5,"ramLoad":48,"cpuTemp":61.3,"fps":144}}` | Every second. Loads are in percent, temperatures in °C, and `fps` is the frames per second of the app in front. A reading the PC can't give is left out: `cpuTemp` needs LibreHardwareMonitor and `fps` needs PresentMon. |
+| `{"type":"stats","stats":{"cpuLoad":23.5,"gpuLoad":41,"gpuTemp":62.5,"ramLoad":48,"cpuTemp":61.3,"fps":144}}` | Every second. Loads are in percent, temperatures in °C, and `fps` is the frames per second of the app in front. A reading the PC can't give is left out: `cpuTemp` needs LibreHardwareMonitor, and `fps` needs the Windows user in the Performance Log Users group. |
 | `{"type":"error","message":"..."}` | Something could not be done, for example a deck that breaks a rule below, or `"Key buttons work on Windows for now."`. Anything else gets `"Unknown message"`. |
 
 ## Deck

@@ -1,83 +1,78 @@
-using System.Globalization;
-
 namespace DeskPilot.Agent.Tests;
 
 public class FrameCounterTests
 {
-    const string Header =
-        "Application,ProcessID,SwapChainAddress,PresentRuntime,SyncInterval,PresentFlags,AllowsTearing,PresentMode,CPUStartTime,MsBetweenPresents";
-
-    static string Frame(int process, double time) =>
-        $"game.exe,{process},0x1,DXGI,0,0,1,Hardware: Independent Flip,{time.ToString(CultureInfo.InvariantCulture)},6.94";
+    static void Draw(FrameCounter counter, int process, FrameSource source, int frames, double fps)
+    {
+        for (var frame = 0; frame < frames; frame++)
+        {
+            counter.Add(process, source, frame / fps);
+        }
+    }
 
     [Fact]
-    public void CountsTheFramesOfEachAppInTheLastSecond()
+    public void CountsTheFramesOfAnAppInTheLastSecond()
     {
         var counter = new FrameCounter();
-        counter.Add(Header);
-        for (var frame = 0; frame < 300; frame++)
-        {
-            counter.Add(Frame(42, frame / 144.0));
-        }
-        counter.Add(Frame(7, 2.0));
+
+        Draw(counter, 42, FrameSource.DirectX, 300, 144);
 
         Assert.InRange(counter.Fps(42)!.Value, 143, 145);
-        Assert.Equal(1, counter.Fps(7));
+    }
+
+    [Fact]
+    public void AFrameSeenByDirectXAndTheKernelCountsOnce()
+    {
+        var counter = new FrameCounter();
+
+        Draw(counter, 42, FrameSource.DirectX, 300, 144);
+        Draw(counter, 42, FrameSource.Kernel, 300, 144);
+
+        Assert.InRange(counter.Fps(42)!.Value, 143, 145);
+    }
+
+    [Fact]
+    public void VulkanAndOpenGlGamesCountThroughTheKernel()
+    {
+        var counter = new FrameCounter();
+
+        Draw(counter, 7, FrameSource.Kernel, 120, 60);
+
+        Assert.InRange(counter.Fps(7)!.Value, 59, 61);
     }
 
     [Fact]
     public void AnAppThatStoppedDrawingHasNoFps()
     {
         var counter = new FrameCounter();
-        counter.Add(Header);
-        counter.Add(Frame(42, 0.5));
-        counter.Add(Frame(7, 5.0));
+        counter.Add(42, FrameSource.DirectX, 0.5);
+        counter.Add(7, FrameSource.DirectX, 5.0);
 
         Assert.Null(counter.Fps(42));
     }
 
     [Fact]
-    public void AnAppPresentMonHasNotSeenHasNoFps() => Assert.Null(new FrameCounter().Fps(42));
-
-    [Fact]
-    public void LinesBeforeTheHeaderAndBrokenLinesAreIgnored()
-    {
-        var counter = new FrameCounter();
-        counter.Add(Frame(42, 1.0));
-        counter.Add(Header);
-        counter.Add("error: something PresentMon said");
-        counter.Add("game.exe,not a number,0x1");
-        counter.Add(Frame(42, 1.0));
-
-        Assert.Equal(1, counter.Fps(42));
-    }
-
-    [Fact]
-    public void FindsItsColumnsWhereverPresentMonPutsThem()
-    {
-        var counter = new FrameCounter();
-        counter.Add("CPUStartTime,Application,ProcessID");
-        counter.Add("1.5,game.exe,42");
-
-        Assert.Equal(1, counter.Fps(42));
-    }
+    public void AnAppThatNeverDrewHasNoFps() => Assert.Null(new FrameCounter().Fps(42));
 }
 
-public class PresentMonFpsTests
+public class WindowsFpsTests
 {
     [Fact]
-    public void WithoutPresentMonThereIsNoFpsAndOneHint()
+    public void TheWindowsEventLayoutsHaveTheSizesWindowsExpects() => Assert.True(EtwFrames.LayoutIsRight);
+
+    [Fact]
+    public void ListeningForFramesStartsOrSaysWhy()
     {
         var hints = new List<string>();
-        using var fps = new PresentMonFps(hints.Add);
+        using var fps = new WindowsFps(hints.Add);
 
-        Assert.Null(fps.Read());
-        Assert.Null(fps.Read());
+        var reading = fps.Read();
 
+        Assert.True(reading is null or >= 0);
         if (OperatingSystem.IsWindows())
         {
-            // The Windows CI machine has no PresentMon installed.
-            Assert.Contains("winget install Intel.PresentMon.Console", Assert.Single(hints));
+            // Starting works as administrator or in Performance Log Users. Anything else means a broken call.
+            Assert.True(hints.Count == 0 || hints[0].Contains("Performance Log Users"), string.Join(" ", hints));
         }
         else
         {

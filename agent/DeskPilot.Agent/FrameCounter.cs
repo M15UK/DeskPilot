@@ -1,47 +1,37 @@
-using System.Globalization;
-
 namespace DeskPilot.Agent;
 
 /// <summary>
-/// Turns PresentMon's CSV output, one line per frame, into frames per second for each app.
-/// It uses PresentMon's own frame times, so lines that arrive in bursts still count right.
+/// Where Windows reported a frame. DirectX games show up in DirectX and in the graphics kernel;
+/// Vulkan and OpenGL games only in the kernel.
+/// </summary>
+public enum FrameSource
+{
+    DirectX,
+    Kernel,
+}
+
+/// <summary>
+/// Turns frame events into frames per second for each app. It goes by the events' own times,
+/// so events that arrive in bursts still count right.
 /// </summary>
 public sealed class FrameCounter
 {
     const double WindowSeconds = 1.0;
 
     readonly Lock gate = new();
-    readonly Dictionary<int, Queue<double>> frames = [];
-    int processColumn = -1;
-    int timeColumn = -1;
+    readonly Dictionary<(int Process, FrameSource Source), Queue<double>> frames = [];
     double latest;
 
-    public void Add(string line)
+    public void Add(int process, FrameSource source, double seconds)
     {
-        var fields = line.Split(',');
         lock (gate)
         {
-            if (fields.Contains("ProcessID") && fields.Contains("CPUStartTime"))
+            latest = Math.Max(latest, seconds);
+            if (!frames.TryGetValue((process, source), out var times))
             {
-                processColumn = Array.IndexOf(fields, "ProcessID");
-                timeColumn = Array.IndexOf(fields, "CPUStartTime");
-                frames.Clear();
-                latest = 0;
-                return;
+                frames[(process, source)] = times = new Queue<double>();
             }
-            if (processColumn < 0
-                || fields.Length <= Math.Max(processColumn, timeColumn)
-                || !int.TryParse(fields[processColumn], CultureInfo.InvariantCulture, out var process)
-                || !double.TryParse(fields[timeColumn], CultureInfo.InvariantCulture, out var time))
-            {
-                return;
-            }
-            latest = Math.Max(latest, time);
-            if (!frames.TryGetValue(process, out var times))
-            {
-                frames[process] = times = new Queue<double>();
-            }
-            times.Enqueue(time);
+            times.Enqueue(seconds);
             DropOld(times);
         }
     }
@@ -51,15 +41,20 @@ public sealed class FrameCounter
     {
         lock (gate)
         {
-            foreach (var (id, times) in frames.ToArray())
+            foreach (var (key, times) in frames.ToArray())
             {
                 DropOld(times);
                 if (times.Count == 0)
                 {
-                    frames.Remove(id);
+                    frames.Remove(key);
                 }
             }
-            return frames.TryGetValue(process, out var recent) ? recent.Count : null;
+            // The kernel also sees DirectX frames, so it only counts for apps DirectX doesn't report.
+            if (frames.TryGetValue((process, FrameSource.DirectX), out var directX))
+            {
+                return directX.Count;
+            }
+            return frames.TryGetValue((process, FrameSource.Kernel), out var kernel) ? kernel.Count : null;
         }
     }
 
