@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-const _protocolVersion = 3;
+const _protocolVersion = 4;
 final _fingerprintPattern = RegExp(r'^[0-9a-f]{64}$');
 
 /// A PC running DeskPilot, as its pairing QR code describes it.

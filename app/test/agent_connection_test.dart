@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_pc.dart';
 
-const hello = {'type': 'hello', 'name': 'GAMING-PC', 'version': 3};
+const hello = {'type': 'hello', 'name': 'GAMING-PC', 'version': 4};
 
 void main() {
   FakePc? pc;
@@ -152,6 +152,15 @@ void main() {
       readEvent('{"type":"deck","deck":{"pages":[]}}'),
       isA<PcSays>(),
       reason: 'a deck the app cannot show',
+    );
+    expect(
+      readEvent(
+        '{"type":"stats","stats":{"cpuLoad":12.5,"gpuTemp":41,"ramLoad":"x"}}',
+      ),
+      isA<StatsChanged>().having((e) => e.stats, 'stats', {
+        'cpuLoad': 12.5,
+        'gpuTemp': 41.0,
+      }),
     );
     expect(
       readEvent('not json'),

@@ -52,7 +52,8 @@ public class DeckTests
             """{"id":"previous","label":"Previous","action":{"kind":"media","media":"previous"}},""" +
             """{"id":"play-pause","label":"Play / Pause","action":{"kind":"media","media":"playPause"}},""" +
             """{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]}},""" +
-            """{"id":"ac","label":"Assetto Corsa","action":{"kind":"open","target":"steam://rungameid/244210"}}""" +
+            """{"id":"ac","label":"Assetto Corsa","action":{"kind":"open","target":"steam://rungameid/244210"}},""" +
+            """{"id":"cpu","label":"CPU","action":{"kind":"stat","stat":"cpuLoad","style":"gauge"}}""" +
             """]}]}""";
         var deck = new Deck([new DeckPage("Main",
         [
@@ -60,6 +61,7 @@ public class DeckTests
             new DeckButton("play-pause", "Play / Pause", new MediaAction("playPause")),
             new DeckButton("pit", "Pit", new KeysAction(["Ctrl+P", "Enter"])),
             new DeckButton("ac", "Assetto Corsa", new OpenAction("steam://rungameid/244210")),
+            new DeckButton("cpu", "CPU", new StatAction("cpuLoad", "gauge")),
         ])]);
 
         Assert.Equal(expected, Json(deck));
@@ -87,6 +89,8 @@ public class DeckTests
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"}},{"id":"a","label":"B","action":{"kind":"media","media":"next"}}]}]}""")]
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"shell","command":"format c:"}}]}]}""")]
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","action":{"kind":"media","media":"next"}}]}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"stat","stat":"cpuSpeed","style":"gauge"}}]}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"stat","stat":"cpuLoad","style":"dial"}}]}]}""")]
     [InlineData("""["not","a","deck"]""")]
     public void BadDecksAreRefused(string json)
     {

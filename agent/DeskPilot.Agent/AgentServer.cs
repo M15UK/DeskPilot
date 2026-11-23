@@ -7,6 +7,9 @@ namespace DeskPilot.Agent;
 /// <summary>What keeps strangers out: the agent's certificate, the pairing code and the paired phones.</summary>
 public sealed record AgentSecurity(X509Certificate2 Certificate, PairingCodes Codes, PairedPhones Phones);
 
+/// <summary>Everything a phone's session works with.</summary>
+public sealed record AgentServices(AgentSecurity Security, DeckStore Decks, StatsFeed Stats, Func<ButtonAction, Task> Run);
+
 /// <summary>The result of a phone's first message: whether it may stay, and what to send it.</summary>
 public sealed record SignInResult(bool Allowed, IReadOnlyList<string> Replies);
 
@@ -16,13 +19,13 @@ public static class AgentServer
     public const int DefaultPort = 8740;
     public const int MaxSignInBytes = 4096;
     public const int MaxMessageBytes = 1024 * 1024;
-    public const int ProtocolVersion = 3;
+    public const int ProtocolVersion = 4;
 
-    public static WebApplication Create(int port, AgentSecurity security, DeckStore decks, Func<ButtonAction, Task> run)
+    public static WebApplication Create(int port, AgentServices services)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.ConfigureKestrel(kestrel =>
-            kestrel.ListenAnyIP(port, listen => listen.UseHttps(security.Certificate)));
+            kestrel.ListenAnyIP(port, listen => listen.UseHttps(services.Security.Certificate)));
         builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
         var app = builder.Build();
         app.UseWebSockets();
@@ -34,7 +37,7 @@ public static class AgentServer
                 return;
             }
             using var socket = await context.WebSockets.AcceptWebSocketAsync();
-            var session = new Session(socket, security, decks, run, app.Logger, context.RequestAborted);
+            var session = new Session(socket, services, app.Logger, context.RequestAborted);
             try
             {
                 await session.RunAsync(context.Connection.RemoteIpAddress);
@@ -98,6 +101,9 @@ public static class AgentServer
     }
 
     internal static string DeckMessage(Deck deck) => JsonSerializer.Serialize(new { type = "deck", deck }, Deck.Json);
+
+    public static string StatsMessage(PcStats stats) =>
+        JsonSerializer.Serialize(new { type = "stats", stats }, PcStats.Json);
 
     internal static string Error(string message) => JsonSerializer.Serialize(new { type = "error", message });
 

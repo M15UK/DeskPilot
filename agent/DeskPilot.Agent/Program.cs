@@ -13,8 +13,12 @@ var security = new AgentSecurity(
 
 var decks = new DeckStore(Path.Combine(folder, "deck.json"));
 
-var app = AgentServer.Create(AgentServer.DefaultPort, security, decks, Actions.RunAsync);
+using var statsReader = new StatsReader();
+var stats = new StatsFeed(statsReader.Read);
+
+var app = AgentServer.Create(AgentServer.DefaultPort, new AgentServices(security, decks, stats, Actions.RunAsync));
 await app.StartAsync();
+_ = stats.RunAsync(app.Logger, app.Lifetime.ApplicationStopping);
 
 Console.WriteLine($"DeskPilot is running on {Environment.MachineName}. Paired phones: {security.Phones.Count}.");
 Console.WriteLine("Press Enter to pair a phone. Type forget and press Enter to unpair every phone. Press Ctrl+C to stop.");

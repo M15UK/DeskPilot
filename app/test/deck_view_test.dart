@@ -129,4 +129,83 @@ void main() {
     );
     expect(shownPage, 2);
   });
+
+  group('stat tiles', () {
+    const pcDeck = Deck([
+      DeckPage(
+        name: 'PC',
+        buttons: [
+          DeckButton(
+            id: 'gpu-temp',
+            label: 'GPU temperature',
+            action: StatAction('gpuTemp', 'number'),
+          ),
+          DeckButton(
+            id: 'cpu',
+            label: 'CPU',
+            action: StatAction('cpuLoad', 'gauge'),
+          ),
+          DeckButton(
+            id: 'ram',
+            label: 'RAM',
+            action: StatAction('ramLoad', 'chart'),
+          ),
+        ],
+      ),
+    ]);
+
+    Widget stats() => MaterialApp(
+      home: Scaffold(
+        body: DeckView(
+          deck: pcDeck,
+          page: 0,
+          editing: false,
+          onPress: (id) => pressed = id,
+          onChange: (deck) => changed = deck,
+          onPageChanged: (page) => shownPage = page,
+          stats: const {'gpuTemp': 41.4, 'cpuLoad': 23.6},
+          history: const {
+            'cpuLoad': [10, 23.6],
+          },
+        ),
+      ),
+    );
+
+    testWidgets('show the PC readings', (tester) async {
+      await tester.pumpWidget(stats());
+
+      expect(find.text('41°C'), findsOneWidget);
+      expect(find.text('24%'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('—'), findsOneWidget, reason: 'no RAM reading yet');
+    });
+
+    testWidgets('do not press anything', (tester) async {
+      await tester.pumpWidget(stats());
+
+      await tester.tap(find.text('41°C'));
+
+      expect(pressed, isNull);
+    });
+
+    testWidgets('can be added in edit mode', (tester) async {
+      await tester.pumpWidget(host(editing: true));
+
+      await tester.tap(find.text('Add button'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Label'),
+        'CPU',
+      );
+      await tester.tap(find.text('Stat'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final added = changed!.pages[0].buttons.last.action;
+      expect(added, isA<StatAction>());
+      expect((added as StatAction).stat, 'cpuLoad');
+      expect(added.style, 'number');
+    });
+  });
 }

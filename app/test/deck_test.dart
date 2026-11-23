@@ -9,7 +9,8 @@ const pcDeck =
     '{"id":"previous","label":"Previous","action":{"kind":"media","media":"previous"}},'
     '{"id":"play-pause","label":"Play / Pause","action":{"kind":"media","media":"playPause"}},'
     '{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]}},'
-    '{"id":"ac","label":"Assetto Corsa","action":{"kind":"open","target":"steam://rungameid/244210"}}'
+    '{"id":"ac","label":"Assetto Corsa","action":{"kind":"open","target":"steam://rungameid/244210"}},'
+    '{"id":"cpu","label":"CPU","action":{"kind":"stat","stat":"cpuLoad","style":"gauge"}}'
     ']}]}';
 
 Deck sample() => Deck.fromJson(jsonDecode(pcDeck))!;
@@ -36,6 +37,7 @@ void main() {
       'no pages': '{}',
       'an unknown action': '{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"shell","command":"x"}}]}]}',
       'combos that are not text': '{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"keys","combos":[1]}}]}]}',
+      'an unknown stat': '{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"stat","stat":"cpuSpeed","style":"gauge"}}]}]}',
       'a button without a label': '{"pages":[{"name":"Main","buttons":[{"id":"a","action":{"kind":"media","media":"next"}}]}]}',
     };
     broken.forEach((what, json) {
@@ -55,6 +57,7 @@ void main() {
       'play-pause',
       'pit',
       'ac',
+      'cpu',
       'new',
     ]);
   });
@@ -68,7 +71,7 @@ void main() {
 
     final deck = sample().withButton(0, renamed);
 
-    expect(ids(deck), ['previous', 'play-pause', 'pit', 'ac']);
+    expect(ids(deck), ['previous', 'play-pause', 'pit', 'ac', 'cpu']);
     expect(deck.pages[0].buttons[2].label, 'Box box');
   });
 
@@ -78,17 +81,20 @@ void main() {
       'pit',
       'play-pause',
       'ac',
+      'cpu',
     ]);
-    expect(ids(sample().movedButton('ac', 1)), [
+    expect(ids(sample().movedButton('cpu', 1)), [
       'previous',
       'play-pause',
       'pit',
       'ac',
+      'cpu',
     ]);
     expect(ids(sample().withoutButton('pit')), [
       'previous',
       'play-pause',
       'ac',
+      'cpu',
     ]);
   });
 

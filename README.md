@@ -4,9 +4,8 @@
 [![PC app](https://github.com/M15UK/DeskPilot/actions/workflows/agent.yml/badge.svg)](https://github.com/M15UK/DeskPilot/actions/workflows/agent.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Status: step 3 of 8 is done. Your phone shows a deck of buttons you set up yourself: media keys, key
-combos and macros, and buttons that open apps and websites. Follow along in the
-[build plan](docs/PLAN.md).**
+**Status: step 4 of 8 is under way. Your phone shows a deck of buttons you set up yourself, plus live
+CPU, GPU and RAM load and GPU temperature. Follow along in the [build plan](docs/PLAN.md).**
 
 DeskPilot turns your phone into a control deck for your gaming PC. Tap buttons to control music,
 Discord and your games, and see live PC stats like temperature and FPS. It is made for gamers and
@@ -115,18 +114,22 @@ Tap the pencil at the top. Then:
   * **Keys:** a key combo like `Ctrl+Shift+M`. Type several with commas, like `Ctrl+C, Alt+Tab, Ctrl+V`,
     and they run one after another as a macro.
   * **Open:** an app, file, folder or website, like `C:\Games\game.exe` or `steam://rungameid/244210`.
+  * **Stat:** a live reading of CPU load, GPU load, GPU temperature or RAM, shown as a number, a gauge
+    or a chart of the last minute.
 * Tap a button to change it, move it, or delete it.
 * Use **Add page** and **Page settings** to make pages, like one for music and one per game.
 
 Tap the check mark when you're done. The deck lives on your PC, so every paired phone shows the same
 buttons.
 
-To run the tests, use `dotnet test agent/DeskPilot.slnx` (55 tests) and `flutter test` in the app
-folder (28 tests).
+To run the tests, use `dotnet test agent/DeskPilot.slnx` (61 tests) and `flutter test` in the app
+folder (31 tests).
 
 ## Limits
 
-* Media and key buttons work on Windows only for now. Open buttons also work on a Mac.
+* Media and key buttons and the readings work on Windows only for now. Open buttons also work on a Mac.
+* CPU temperature and FPS are not there yet. Windows doesn't share them by itself, so they need an extra
+  tool.
 * Key buttons can't reach a game or app that runs as administrator, unless DeskPilot runs as
   administrator too.
 * A paired phone can make buttons that open any app on your PC, so only pair your own phones.

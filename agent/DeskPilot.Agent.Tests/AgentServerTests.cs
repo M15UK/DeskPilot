@@ -92,6 +92,7 @@ public class ServerTests : IAsyncLifetime
     readonly TempFolder folder = new();
     AgentSecurity security = null!;
     DeckStore decks = null!;
+    StatsFeed stats = null!;
     WebApplication app = null!;
     Uri uri = null!;
 
@@ -102,11 +103,12 @@ public class ServerTests : IAsyncLifetime
             new PairingCodes(TimeProvider.System),
             new PairedPhones(Path.Combine(folder.Path, "phones.json")));
         decks = new DeckStore(Path.Combine(folder.Path, "deck.json"));
-        app = AgentServer.Create(port: 0, security, decks, action =>
+        stats = new StatsFeed(() => new PcStats(CpuLoad: 50, GpuLoad: null, GpuTemp: null, RamLoad: 40));
+        app = AgentServer.Create(port: 0, new AgentServices(security, decks, stats, action =>
         {
             ran.Writer.TryWrite(action);
             return Task.CompletedTask;
-        });
+        }));
         await app.StartAsync();
         var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
         uri = new Uri($"wss://127.0.0.1:{new Uri(address).Port}/ws");
@@ -132,7 +134,7 @@ public class ServerTests : IAsyncLifetime
             using var hello = await ReceiveJsonAsync(phone);
             Assert.Equal("hello", Type(hello));
             Assert.Equal(Environment.MachineName, hello.RootElement.GetProperty("name").GetString());
-            Assert.Equal(3, hello.RootElement.GetProperty("version").GetInt32());
+            Assert.Equal(4, hello.RootElement.GetProperty("version").GetInt32());
             using var deck = await ReceiveJsonAsync(phone);
             Assert.Equal("deck", Type(deck));
         }
@@ -163,6 +165,19 @@ public class ServerTests : IAsyncLifetime
             Assert.Equal("deck", Type(update));
             Assert.Equal("Racing", PageName(update));
         }
+    }
+
+    [Fact]
+    public async Task ASignedInPhoneGetsStatsEverySecond()
+    {
+        using var phone = await SignedInPhoneAsync();
+
+        stats.Tick();
+        using var update = await ReceiveJsonAsync(phone);
+
+        Assert.Equal("stats", Type(update));
+        Assert.Equal(50, update.RootElement.GetProperty("stats").GetProperty("cpuLoad").GetDouble());
+        Assert.False(update.RootElement.GetProperty("stats").TryGetProperty("gpuLoad", out _));
     }
 
     [Theory]

@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 final fingerprint = 'a' * 64;
 
 String qrText({
-  Object? version = 3,
+  Object? version = 4,
   Object? hosts = const ['192.168.1.50', '10.0.0.7'],
   Object? port = 8740,
   Object? fingerprint,
@@ -37,7 +37,7 @@ void main() {
   test('refuses QR codes that are not from DeskPilot', () {
     final notOurs = {
       'a website': 'https://example.com',
-      'an older version': qrText(version: 2),
+      'an older version': qrText(version: 3),
       'a bad fingerprint': qrText(fingerprint: 'xyz'),
       'no addresses': qrText(hosts: <String>[]),
       'a name instead of an address': qrText(hosts: ['evil.example.com']),

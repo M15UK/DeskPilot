@@ -142,6 +142,14 @@ final class DeckChanged extends AgentEvent {
   final Deck deck;
 }
 
+/// The PC's readings, sent each second. A reading the PC can't give is left
+/// out.
+final class StatsChanged extends AgentEvent {
+  const StatsChanged(this.stats);
+
+  final Map<String, double> stats;
+}
+
 /// A message for the user, usually why something didn't work.
 final class PcSays extends AgentEvent {
   const PcSays(this.text);
@@ -165,6 +173,11 @@ AgentEvent readEvent(String message) {
         "The PC sent a deck this app can't show. Update the app.",
       ),
     },
+    {'type': 'stats', 'stats': final Map<String, Object?> stats} =>
+      StatsChanged({
+        for (final MapEntry(:key, :value) in stats.entries)
+          if (value is num) key: value.toDouble(),
+      }),
     {'type': 'error', 'message': final String text} => PcSays(text),
     _ => const PcSays('Unexpected message from the PC'),
   };

@@ -39,6 +39,8 @@ class _DeckPageState extends State<DeckPage> {
   SavedPc? _saved;
   AgentConnection? _agent;
   Deck? _deck;
+  Map<String, double> _stats = const {};
+  Map<String, List<double>> _history = const {};
   int _page = 0;
   bool _editing = false;
   bool _loading = true;
@@ -127,6 +129,9 @@ class _DeckPageState extends State<DeckPage> {
       switch (event) {
         case DeckChanged(:final deck):
           _deck = deck;
+        case StatsChanged(:final stats):
+          _stats = stats;
+          _history = _withReadings(_history, stats);
         case PcSays(:final text):
           _status = text;
       }
@@ -149,6 +154,8 @@ class _DeckPageState extends State<DeckPage> {
       _agent = null;
       _saved = null;
       _deck = null;
+      _stats = const {};
+      _history = const {};
       _page = 0;
       _editing = false;
       _busy = false;
@@ -166,6 +173,7 @@ class _DeckPageState extends State<DeckPage> {
     if (!mounted || _agent != agent) return;
     setState(() {
       _agent = null;
+      _stats = const {};
       _status = 'Lost the connection to ${agent.pcName}';
     });
   }
@@ -262,9 +270,25 @@ class _DeckPageState extends State<DeckPage> {
                   onPress: agent?.press,
                   onChange: _save,
                   onPageChanged: (page) => setState(() => _page = page),
+                  stats: _stats,
+                  history: _history,
                 ),
         ),
       ],
     );
   }
 }
+
+/// Adds the newest readings to the last minute of each one, for chart tiles.
+Map<String, List<double>> _withReadings(
+  Map<String, List<double>> history,
+  Map<String, double> stats,
+) => {
+  for (final MapEntry(:key, :value) in stats.entries)
+    key: List.unmodifiable([
+      ...(history[key] ?? const <double>[]).skip(
+        max(0, (history[key]?.length ?? 0) - (statHistoryLength - 1)),
+      ),
+      value,
+    ]),
+};

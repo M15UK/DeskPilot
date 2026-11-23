@@ -4,19 +4,16 @@ using System.Text;
 
 namespace DeskPilot.Agent;
 
-/// <summary>One phone's connection: signing in, then its messages, plus deck changes made on other phones.</summary>
-sealed class Session(
-    WebSocket socket,
-    AgentSecurity security,
-    DeckStore decks,
-    Func<ButtonAction, Task> run,
-    ILogger logger,
-    CancellationToken cancel)
+/// <summary>
+/// One phone's connection: signing in, then its messages, plus deck changes made on other phones
+/// and the PC stats each second.
+/// </summary>
+sealed class Session(WebSocket socket, AgentServices services, ILogger logger, CancellationToken cancel)
 {
     static readonly TimeSpan SignInTimeout = TimeSpan.FromSeconds(10);
 
     readonly byte[] buffer = new byte[AgentServer.MaxMessageBytes];
-    // A WebSocket allows one send at a time, and deck changes arrive while the phone is talking.
+    // A WebSocket allows one send at a time, and deck changes and stats arrive while the phone is talking.
     readonly SemaphoreSlim sendLock = new(1, 1);
 
     public async Task RunAsync(IPAddress? address)
@@ -31,7 +28,7 @@ sealed class Session(
         {
             return;
         }
-        var signIn = AgentServer.SignIn(first, security);
+        var signIn = AgentServer.SignIn(first, services.Security);
         foreach (var reply in signIn.Replies)
         {
             await SendAsync(reply);
@@ -44,10 +41,11 @@ sealed class Session(
         }
 
         logger.LogInformation("Phone connected from {Address}", address);
-        decks.Changed += OnDeckChanged;
+        services.Decks.Changed += OnDeckChanged;
+        services.Stats.Updated += OnStats;
         try
         {
-            await SendAsync(AgentServer.DeckMessage(decks.Current));
+            await SendAsync(AgentServer.DeckMessage(services.Decks.Current));
             while (await ReceiveAsync(AgentServer.MaxMessageBytes, cancel) is { } message)
             {
                 if (await HandleSafelyAsync(message) is { } reply)
@@ -58,12 +56,15 @@ sealed class Session(
         }
         finally
         {
-            decks.Changed -= OnDeckChanged;
+            services.Stats.Updated -= OnStats;
+            services.Decks.Changed -= OnDeckChanged;
             logger.LogInformation("Phone disconnected");
         }
     }
 
     void OnDeckChanged(Deck deck) => _ = SendQuietlyAsync(AgentServer.DeckMessage(deck));
+
+    void OnStats(PcStats stats) => _ = SendQuietlyAsync(AgentServer.StatsMessage(stats));
 
     async Task SendQuietlyAsync(string json)
     {
@@ -81,7 +82,7 @@ sealed class Session(
     {
         try
         {
-            return await AgentServer.HandleAsync(message, decks, run);
+            return await AgentServer.HandleAsync(message, services.Decks, services.Run);
         }
         catch (Exception e)
         {

@@ -18,6 +18,8 @@ class DeckView extends StatelessWidget {
     required this.onPress,
     required this.onChange,
     required this.onPageChanged,
+    this.stats = const {},
+    this.history = const {},
   });
 
   final Deck deck;
@@ -28,6 +30,12 @@ class DeckView extends StatelessWidget {
   final ValueChanged<String>? onPress;
   final ValueChanged<Deck> onChange;
   final ValueChanged<int> onPageChanged;
+
+  /// The PC's latest readings, by [statNames] key.
+  final Map<String, double> stats;
+
+  /// The last minute of each reading, oldest first, for chart tiles.
+  final Map<String, List<double>> history;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +66,15 @@ class DeckView extends StatelessWidget {
   }
 
   Widget _tile(BuildContext context, DeckButton button) {
+    if (button.action case final StatAction stat) {
+      return _StatTile(
+        label: button.label,
+        action: stat,
+        value: stats[stat.stat],
+        history: history[stat.stat] ?? const [],
+        onTap: editing ? () => _editButton(context, button) : null,
+      );
+    }
     final press = onPress;
     return FilledButton.tonal(
       onPressed: editing
@@ -167,6 +184,7 @@ IconData _iconFor(ButtonAction action) => switch (action) {
   MediaAction() => Icons.music_note_rounded,
   KeysAction() => Icons.keyboard_rounded,
   OpenAction() => Icons.open_in_new_rounded,
+  StatAction() => Icons.speed_rounded,
 };
 
 String? _required(String? text, String message) =>
@@ -224,7 +242,16 @@ class _ButtonEditorState extends State<ButtonEditor> {
   late String _kind = switch (widget.button?.action) {
     KeysAction() => 'keys',
     OpenAction() => 'open',
+    StatAction() => 'stat',
     _ => 'media',
+  };
+  late String _stat = switch (widget.button?.action) {
+    StatAction(:final stat) => stat,
+    _ => 'cpuLoad',
+  };
+  late String _style = switch (widget.button?.action) {
+    StatAction(:final style) => style,
+    _ => 'number',
   };
   late String _media = switch (widget.button?.action) {
     MediaAction(:final media) => media,
@@ -249,6 +276,7 @@ class _ButtonEditorState extends State<ButtonEditor> {
       ),
     ),
     'open' => OpenAction(_target.text.trim()),
+    'stat' => StatAction(_stat, _style),
     _ => MediaAction(_media),
   };
 
@@ -286,6 +314,7 @@ class _ButtonEditorState extends State<ButtonEditor> {
                   ButtonSegment(value: 'media', label: Text('Media')),
                   ButtonSegment(value: 'keys', label: Text('Keys')),
                   ButtonSegment(value: 'open', label: Text('Open')),
+                  ButtonSegment(value: 'stat', label: Text('Stat')),
                 ],
                 selected: {_kind},
                 onSelectionChanged: (kinds) =>
@@ -312,6 +341,34 @@ class _ButtonEditorState extends State<ButtonEditor> {
                   ),
                   validator: (text) =>
                       _required(text, 'Type what the button opens'),
+                ),
+                'stat' => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  spacing: 16,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: _stat,
+                      decoration: const InputDecoration(labelText: 'Reading'),
+                      items: [
+                        for (final MapEntry(:key, :value) in statNames.entries)
+                          DropdownMenuItem(value: key, child: Text(value)),
+                      ],
+                      onChanged: (stat) =>
+                          setState(() => _stat = stat ?? _stat),
+                    ),
+                    DropdownButtonFormField<String>(
+                      initialValue: _style,
+                      decoration: const InputDecoration(
+                        labelText: 'Show it as',
+                      ),
+                      items: [
+                        for (final MapEntry(:key, :value) in statStyles.entries)
+                          DropdownMenuItem(value: key, child: Text(value)),
+                      ],
+                      onChanged: (style) =>
+                          setState(() => _style = style ?? _style),
+                    ),
+                  ],
                 ),
                 _ => DropdownButtonFormField<String>(
                   initialValue: _media,
@@ -431,4 +488,128 @@ class _PageEditorState extends State<PageEditor> {
       FilledButton(onPressed: _save, child: const Text('Save')),
     ],
   );
+}
+
+/// How many readings a chart tile shows: one a second for a minute.
+const statHistoryLength = 60;
+
+/// How a reading looks on a tile: 41°C, 24%, or a dash when the PC can't
+/// tell.
+String formatStat(String stat, double? value) => switch (value) {
+  null => '—',
+  final value when stat.endsWith('Temp') => '${value.round()}°C',
+  final value => '${value.round()}%',
+};
+
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.label,
+    required this.action,
+    required this.value,
+    required this.history,
+    required this.onTap,
+  });
+
+  final String label;
+  final StatAction action;
+  final double? value;
+  final List<double> history;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final reading = Text(
+      formatStat(action.stat, value),
+      style: theme.textTheme.headlineSmall,
+    );
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            children: [
+              Expanded(
+                child: switch (action.style) {
+                  'gauge' => Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      AspectRatio(
+                        aspectRatio: 1,
+                        child: CircularProgressIndicator(
+                          // Percent and °C both fill the ring at 100.
+                          value: ((value ?? 0) / 100).clamp(0.0, 1.0),
+                          strokeWidth: 8,
+                          backgroundColor:
+                              theme.colorScheme.surfaceContainerHighest,
+                        ),
+                      ),
+                      reading,
+                    ],
+                  ),
+                  'chart' => Stack(
+                    children: [
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _ChartPainter(
+                            history,
+                            theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      Align(alignment: Alignment.topLeft, child: reading),
+                    ],
+                  ),
+                  _ => Center(child: reading),
+                },
+              ),
+              const SizedBox(height: 4),
+              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A line of the last minute of a reading, 0 at the bottom and 100 at the
+/// top, growing in from the right.
+class _ChartPainter extends CustomPainter {
+  _ChartPainter(this.points, this.color);
+
+  final List<double> points;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+    final step = size.width / (statHistoryLength - 1);
+    final line = Path();
+    for (final (index, point) in points.indexed) {
+      final x = size.width - (points.length - 1 - index) * step;
+      final y = size.height * (1 - (point / 100).clamp(0.0, 1.0));
+      if (index == 0) {
+        line.moveTo(x, y);
+      } else {
+        line.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(
+      line,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ChartPainter old) =>
+      old.points != points || old.color != color;
 }

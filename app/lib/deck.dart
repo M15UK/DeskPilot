@@ -10,6 +10,17 @@ const mediaKeys = {
   'mute': 'Mute',
 };
 
+/// The PC readings a stat tile can show, and how the app names them.
+const statNames = {
+  'cpuLoad': 'CPU load',
+  'gpuLoad': 'GPU load',
+  'gpuTemp': 'GPU temperature',
+  'ramLoad': 'RAM used',
+};
+
+/// How a stat tile shows its reading.
+const statStyles = {'number': 'Number', 'gauge': 'Gauge', 'chart': 'Chart'};
+
 /// What a deck button does. The kinds are described in docs/PROTOCOL.md.
 sealed class ButtonAction {
   const ButtonAction();
@@ -26,6 +37,9 @@ sealed class ButtonAction {
     {'kind': 'open', 'target': final String target}
         when target.trim().isNotEmpty =>
       OpenAction(target),
+    {'kind': 'stat', 'stat': final String stat, 'style': final String style}
+        when statNames.containsKey(stat) && statStyles.containsKey(style) =>
+      StatAction(stat, style),
     _ => null,
   };
 }
@@ -58,6 +72,22 @@ final class OpenAction extends ButtonAction {
 
   @override
   Map<String, Object> toJson() => {'kind': 'open', 'target': target};
+}
+
+/// A tile that shows a PC reading, one of [statNames], in one of
+/// [statStyles]. Tapping it does nothing.
+final class StatAction extends ButtonAction {
+  const StatAction(this.stat, this.style);
+
+  final String stat;
+  final String style;
+
+  @override
+  Map<String, Object> toJson() => {
+    'kind': 'stat',
+    'stat': stat,
+    'style': style,
+  };
 }
 
 class DeckButton {

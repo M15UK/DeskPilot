@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -9,6 +10,7 @@ namespace DeskPilot.Agent;
 [JsonDerivedType(typeof(MediaAction), "media")]
 [JsonDerivedType(typeof(KeysAction), "keys")]
 [JsonDerivedType(typeof(OpenAction), "open")]
+[JsonDerivedType(typeof(StatAction), "stat")]
 public abstract record ButtonAction;
 
 /// <summary>A media key: playPause, next, previous, volumeUp, volumeDown or mute.</summary>
@@ -19,6 +21,12 @@ public sealed record KeysAction(IReadOnlyList<string> Combos) : ButtonAction;
 
 /// <summary>Opens an app, file, folder or link, the way a double click would.</summary>
 public sealed record OpenAction(string Target) : ButtonAction;
+
+/// <summary>A tile that shows a PC reading from <see cref="PcStats"/> as a number, a gauge or a chart.</summary>
+public sealed record StatAction(string Stat, string Style) : ButtonAction
+{
+    public static readonly FrozenSet<string> Styles = new[] { "number", "gauge", "chart" }.ToFrozenSet();
+}
 
 public sealed record DeckButton(string Id, string Label, ButtonAction Action);
 
@@ -51,6 +59,13 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
         new DeckButton("volume-down", "Volume down", new MediaAction("volumeDown")),
         new DeckButton("mute", "Mute", new MediaAction("mute")),
         new DeckButton("volume-up", "Volume up", new MediaAction("volumeUp")),
+    ]), new DeckPage("PC",
+    [
+        new DeckButton("cpu-load", "CPU", new StatAction("cpuLoad", "gauge")),
+        new DeckButton("gpu-load", "GPU", new StatAction("gpuLoad", "gauge")),
+        new DeckButton("gpu-temp", "GPU temperature", new StatAction("gpuTemp", "number")),
+        new DeckButton("ram-load", "RAM", new StatAction("ramLoad", "gauge")),
+        new DeckButton("cpu-chart", "CPU last minute", new StatAction("cpuLoad", "chart")),
     ])]);
 
     /// <summary>Reads and checks a deck. Returns null and says why when DeskPilot can't use it.</summary>
@@ -117,6 +132,7 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
         KeysAction keys => keys.Combos.Count is > 0 and <= MaxCombos
             && keys.Combos.All(combo => combo is not null && KeyCombo.Parse(combo) is not null),
         OpenAction open => !string.IsNullOrWhiteSpace(open.Target) && open.Target.Length <= MaxTargetLength,
+        StatAction stat => PcStats.Names.Contains(stat.Stat) && StatAction.Styles.Contains(stat.Style),
         _ => false,
     };
 }
