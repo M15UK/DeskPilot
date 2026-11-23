@@ -76,6 +76,60 @@ Each phase ends with something working on your phone.
    service with the PawnIO driver, while the main agent keeps running without admin. Before shipping: confirm PawnIO's redistribution terms (or download it from the official source
    at that moment), check anti-cheat games accept PawnIO, and code sign the installer and helper.
 
+## UI round (before the rest of Phase 5)
+
+Asked for after Phase 5's dashboard worked: a real UI for everything. The look mixes the best of PhoneBox
+(colored stat cards with small charts), DeskHub (ring gauges, page rail, big icon buttons), Stream Deck
+(pages, folders) and Touch Portal (sliders, wide tiles), on a dark screen. Each step ends tested on the PC
+and tablet.
+
+1. **Look and editor:** dark theme; a page rail on the left of a tablet (a bottom bar on a phone); every
+   button gets an icon and a color; a stat tile names itself from the reading (editable); drag to reorder;
+   a live preview in the editor; haptic feedback on presses.
+2. **Now playing:** a music card with the song's cover art, title, artist, the app playing it, progress and
+   controls. The agent reads it from Windows' media session, so it works with Spotify, browsers and most
+   players.
+3. **Racing page** (instead of a full screen dash): live info on top (gear and speed with a small shift
+   light bar, delta, last and best lap, fuel with laps left and how much to add at the pit, four tyres
+   colored by temperature with pressures, position, lap, flag) and big buttons below (pit limiter that
+   lights up while on, ignition, starter, lights, flash, wipers, plus and minus for TC, ABS and brake bias,
+   camera, look back, hide apps, push to talk, mute, pause). Keys come from the player's own
+   `Documents\Assetto Corsa\cfg\controls.ini` (only cameras F1 to F6 and Ctrl+A / Ctrl+T are known
+   defaults; pit limiter and lights have none). New AC data: delta (physics 312), pit limiter (physics
+   248), tyre pressures (physics 88), flag (graphics 268), pit lane (graphics 276), sectors (graphics 164,
+   168). ACC shares the same layout.
+4. **Settings and PC window:** a settings screen on the phone (PC info, connection, pair another PC,
+   forget, FPS and CPU temperature checks), and a Windows tray app instead of the PowerShell window (QR
+   code, paired phones, status, start with Windows).
+
+## Built in features (instead of Stream Deck plugins)
+
+The most popular Stream Deck plugins are closed source, and Marketplace plugins have used Elgato's DRM
+since January 2026, so DeskPilot can't run them. It builds the same jobs in, in its own look, with no extra
+downloads.
+
+| # | Feature (like the plugin) | How DeskPilot does it |
+|---|---|---|
+| 1 | Assetto Corsa (Race Deck, AC Connect) | The Racing page above |
+| 2 | Discord (Elgato Discord) | Mute, deafen, push to talk, join voice through Discord's local RPC with your own Discord app; Discord keybinds as the fallback |
+| 3 | Music with cover art (Spotify) | Windows' media session; liking songs and playlists through a Spotify sign in later |
+| 4 | Volume per app (Win Tools, Volume Controller) | Core Audio sessions: sliders and mute for the game, Discord, Spotify |
+| 5 | Switch audio device (Audio Switcher) | Headset or speakers in one tap |
+| 6 | Macros (Super Macro, Multi Action) | Record keys on the PC, play them back with delays |
+| 7 | App and game launcher (Advanced Launcher) | Pick from installed apps and Steam games, show if running |
+| 8 | PC tools (Win Tools) | Lock, sleep, screenshot, AMD instant replay, close a stuck game |
+| 9 | PC stats | Done: CPU, GPU, RAM, temperatures, FPS |
+| 10 | OBS Studio (Elgato OBS, OBS Tools) | obs-websocket, built into OBS 28 and later |
+| 11 | Soundboard | Play sound clips on the PC |
+| 12 | Clock, timer, stopwatch | On the phone, no PC needed |
+| 13 | iRacing and other sims (iRaceDeck) | The Racing page fed by each sim's own data |
+| 14 | Smart lights (Hue, Elgato Key Light, Home Assistant) | Each one's local API |
+| 15 | Twitch (Elgato Twitch) | Markers, chat, ads after a Twitch sign in |
+
+Order: 1 to 10 come with the UI round and Phase 5, 11 to 15 after. Later, a plugin host (the Stream Deck
+SDK WebSocket protocol, our own code) can run free open source plugins people add themselves, never
+Marketplace DRM ones.
+
 ## Testing
 
 - Agent: xUnit tests for parsing, pairing and the message format.
