@@ -38,6 +38,15 @@ public sealed class HandleTests : IDisposable
     }
 
     [Fact]
+    public async Task TheMusicCardPressesMediaKeys()
+    {
+        Assert.Null(await HandleAsync("""{"type":"mediaKey","media":"next"}"""));
+        Assert.Equal(new MediaAction("next"), Assert.Single(ran));
+        Assert.Equal("""{"type":"error","message":"Unknown message"}""",
+            await HandleAsync("""{"type":"mediaKey","media":"explode"}"""));
+    }
+
+    [Fact]
     public async Task PressingAButtonThatIsGoneSaysSo()
     {
         var reply = await HandleAsync("""{"type":"press","id":"gone"}""");
@@ -95,6 +104,8 @@ public class ServerTests : IAsyncLifetime
     Feed<PcStats> stats = null!;
     Feed<SimTelemetry> telemetry = null!;
     SimTelemetry? car;
+    Feed<NowPlaying> media = null!;
+    NowPlaying? song;
     WebApplication app = null!;
     Uri uri = null!;
 
@@ -107,7 +118,8 @@ public class ServerTests : IAsyncLifetime
         decks = new DeckStore(Path.Combine(folder.Path, "deck.json"));
         stats = new Feed<PcStats>(TimeSpan.FromSeconds(1), () => new PcStats(CpuLoad: 50, GpuLoad: null, GpuTemp: null, RamLoad: 40));
         telemetry = new Feed<SimTelemetry>(TimeSpan.FromMilliseconds(33), () => car);
-        app = AgentServer.Create(port: 0, new AgentServices(security, decks, stats, telemetry, action =>
+        media = new Feed<NowPlaying>(TimeSpan.FromSeconds(1), () => song);
+        app = AgentServer.Create(port: 0, new AgentServices(security, decks, stats, telemetry, media, action =>
         {
             ran.Writer.TryWrite(action);
             return Task.CompletedTask;
@@ -197,6 +209,32 @@ public class ServerTests : IAsyncLifetime
 
         Assert.Equal("telemetry", Type(update));
         Assert.Equal(7350, update.RootElement.GetProperty("telemetry").GetProperty("rpm").GetDouble());
+    }
+
+    [Fact]
+    public async Task ThePhoneGetsTheSongWithItsCoverOnceThenOnlyChanges()
+    {
+        using var phone = await SignedInPhoneAsync();
+        var now = DateTimeOffset.UtcNow;
+        song = NowPlaying.From("Neon Highway", "The Midnight Drive", "Spotify.exe", playing: true,
+            TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(240), updated: now, now: now, cover: [1, 2, 3]);
+
+        media.Tick();
+        media.Tick(); // nothing changed: nothing is sent
+        song = song with { Playing = false };
+        media.Tick();
+        using var first = await ReceiveJsonAsync(phone);
+        using var second = await ReceiveJsonAsync(phone);
+
+        var playing = first.RootElement.GetProperty("media");
+        Assert.Equal("media", Type(first));
+        Assert.Equal("Neon Highway", playing.GetProperty("title").GetString());
+        Assert.Equal("Spotify", playing.GetProperty("app").GetString());
+        Assert.Equal("AQID", playing.GetProperty("cover").GetString());
+        var paused = second.RootElement.GetProperty("media");
+        Assert.False(paused.GetProperty("playing").GetBoolean());
+        Assert.False(paused.TryGetProperty("cover", out _)); // the phone already has it
+        Assert.Equal(playing.GetProperty("coverId").GetString(), paused.GetProperty("coverId").GetString());
     }
 
     [Theory]

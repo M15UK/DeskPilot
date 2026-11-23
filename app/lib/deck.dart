@@ -105,31 +105,53 @@ final class StatAction extends ButtonAction {
   };
 }
 
+/// A button on a page. [icon] names one of the app's icons and [color] one of
+/// its colors; left null, the app picks both from what the button does.
 class DeckButton {
   const DeckButton({
     required this.id,
     required this.label,
     required this.action,
+    this.icon,
+    this.color,
   });
 
   final String id;
   final String label;
   final ButtonAction action;
+  final String? icon;
+  final String? color;
 
   Map<String, Object> toJson() => {
     'id': id,
     'label': label,
     'action': action.toJson(),
+    'icon': ?icon,
+    'color': ?color,
   };
 
   static DeckButton? fromJson(Object? json) {
-    if (json case {
-      'id': final String id,
-      'label': final String label,
-      'action': final Object? action,
-    }) {
+    if (json
+        case final Map<String, Object?> map &&
+            {
+              'id': final String id,
+              'label': final String label,
+              'action': final Object? action,
+            }) {
       if (ButtonAction.fromJson(action) case final ButtonAction read) {
-        return DeckButton(id: id, label: label, action: read);
+        return DeckButton(
+          id: id,
+          label: label,
+          action: read,
+          icon: switch (map['icon']) {
+            final String icon => icon,
+            _ => null,
+          },
+          color: switch (map['color']) {
+            final String color => color,
+            _ => null,
+          },
+        );
       }
     }
     return null;
@@ -256,3 +278,28 @@ String newButtonId() => [
   for (var i = 0; i < 8; i++)
     _random.nextInt(256).toRadixString(16).padLeft(2, '0'),
 ].join();
+
+/// The name a button gets when its label is left empty: what it does, like
+/// "Next", "Gear" or "acs.exe". At most 40 characters, like any label.
+String autoLabel(ButtonAction action) {
+  final name = switch (action) {
+    MediaAction(:final media) => mediaKeys[media] ?? media,
+    KeysAction(:final combos) => combos.join(', '),
+    OpenAction(:final target) => _openName(target),
+    StatAction(:final stat) => _capitalized(
+      (statNames[stat] ?? stat).replaceFirst('Sim: ', ''),
+    ),
+  };
+  return name.length <= 40 ? name : name.substring(0, 40);
+}
+
+String _capitalized(String text) =>
+    text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
+
+/// A website's host, or the last part of a file or folder path.
+String _openName(String target) {
+  final uri = Uri.tryParse(target);
+  if (uri != null && uri.hasScheme && uri.host.isNotEmpty) return uri.host;
+  final parts = target.split(RegExp(r'[\\/]')).where((part) => part.isNotEmpty);
+  return parts.isEmpty ? target : parts.last;
+}

@@ -8,7 +8,7 @@ const pcDeck =
     '{"pages":[{"name":"Main","buttons":['
     '{"id":"previous","label":"Previous","action":{"kind":"media","media":"previous"}},'
     '{"id":"play-pause","label":"Play / Pause","action":{"kind":"media","media":"playPause"}},'
-    '{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]}},'
+    '{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]},"icon":"flag","color":"amber"},'
     '{"id":"ac","label":"Assetto Corsa","action":{"kind":"open","target":"steam://rungameid/244210"}},'
     '{"id":"cpu","label":"CPU","action":{"kind":"stat","stat":"cpuLoad","style":"gauge"}}'
     ']}]}';

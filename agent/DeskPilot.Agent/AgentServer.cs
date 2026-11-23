@@ -13,6 +13,7 @@ public sealed record AgentServices(
     DeckStore Decks,
     Feed<PcStats> Stats,
     Feed<SimTelemetry> Telemetry,
+    Feed<NowPlaying> Media,
     Func<ButtonAction, Task> Run);
 
 /// <summary>The result of a phone's first message: whether it may stay, and what to send it.</summary>
@@ -80,19 +81,11 @@ public static class AgentServer
         switch (Text(request, "type"))
         {
             case "press" when Text(request, "id") is { } id:
-                if (decks.Current.Find(id) is not { } button)
-                {
-                    return Error("That button is not on the deck any more.");
-                }
-                try
-                {
-                    await run(button.Action);
-                    return null;
-                }
-                catch (PlatformNotSupportedException e)
-                {
-                    return Error(e.Message);
-                }
+                return decks.Current.Find(id) is { } button
+                    ? await RunAsync(run, button.Action)
+                    : Error("That button is not on the deck any more.");
+            case "mediaKey" when Text(request, "media") is { } key && Media.Knows(key):
+                return await RunAsync(run, new MediaAction(key));
             case "saveDeck" when request is { } body && body.TryGetProperty("deck", out var json):
                 if (Deck.Read(json, out var problem) is not { } deck)
                 {
@@ -105,6 +98,19 @@ public static class AgentServer
         }
     }
 
+    static async Task<string?> RunAsync(Func<ButtonAction, Task> run, ButtonAction action)
+    {
+        try
+        {
+            await run(action);
+            return null;
+        }
+        catch (PlatformNotSupportedException e)
+        {
+            return Error(e.Message);
+        }
+    }
+
     internal static string DeckMessage(Deck deck) => JsonSerializer.Serialize(new { type = "deck", deck }, Deck.Json);
 
     public static string StatsMessage(PcStats stats) =>
@@ -112,6 +118,14 @@ public static class AgentServer
 
     public static string TelemetryMessage(SimTelemetry telemetry) =>
         JsonSerializer.Serialize(new { type = "telemetry", telemetry }, PcStats.Json);
+
+    /// <summary>The music card. The cover is left out when the phone already has that picture.</summary>
+    public static string MediaMessage(NowPlaying media, bool withCover) =>
+        JsonSerializer.Serialize(new
+        {
+            type = "media",
+            media = media == NowPlaying.Nothing ? null : withCover ? media : media with { Cover = null },
+        }, PcStats.Json);
 
     internal static string Error(string message) => JsonSerializer.Serialize(new { type = "error", message });
 

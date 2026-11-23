@@ -1,5 +1,7 @@
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/deck_view.dart';
+import 'package:deskpilot/tiles.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -28,10 +30,14 @@ void main() {
     shownPage = null;
   });
 
-  Widget host({bool editing = false, bool connected = true}) => MaterialApp(
+  Widget host({
+    bool editing = false,
+    bool connected = true,
+    Deck shown = deck,
+  }) => MaterialApp(
     home: Scaffold(
       body: DeckView(
-        deck: deck,
+        deck: shown,
         page: 0,
         editing: editing,
         onPress: connected ? (id) => pressed = id : null,
@@ -90,16 +96,31 @@ void main() {
     expect(changed!.pages[0].buttons, hasLength(2));
   });
 
-  testWidgets('a button needs a label', (tester) async {
+  testWidgets('an empty label names the button after what it does', (
+    tester,
+  ) async {
     await tester.pumpWidget(host(editing: true));
 
     await tester.tap(find.text('Add button'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Stat'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Give the button a label'), findsOneWidget);
-    expect(changed, isNull);
+    expect(changed!.pages[0].buttons.last.label, 'CPU load');
+  });
+
+  test('buttons name themselves after what they do', () {
+    expect(autoLabel(const MediaAction('next')), 'Next');
+    expect(autoLabel(const StatAction('gear', 'number')), 'Gear');
+    expect(autoLabel(const StatAction('speed', 'gauge')), 'Speed (km/h)');
+    expect(autoLabel(const KeysAction(['Ctrl+Shift+M'])), 'Ctrl+Shift+M');
+    expect(autoLabel(const OpenAction(r'C:\Games\AC\acs.exe')), 'acs.exe');
+    expect(
+      autoLabel(const OpenAction('https://www.example.com/x')),
+      'www.example.com',
+    );
   });
 
   testWidgets('deletes a button in edit mode', (tester) async {
@@ -112,6 +133,48 @@ void main() {
 
     expect(pressed, isNull);
     expect(changed!.pages[0].buttons, isEmpty);
+  });
+
+  testWidgets('picks an icon and a color for a button', (tester) async {
+    await tester.pumpWidget(host(editing: true));
+
+    await tester.tap(find.text('Play / Pause'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byTooltip('flag'));
+    await tester.tap(find.byTooltip('flag'));
+    await tester.ensureVisible(find.byTooltip('amber'));
+    await tester.tap(find.byTooltip('amber'));
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final saved = changed!.pages[0].buttons.single;
+    expect(saved.icon, 'flag');
+    expect(saved.color, 'amber');
+  });
+
+  testWidgets('dragging a button onto another moves it there', (tester) async {
+    const two = Deck([
+      DeckPage(
+        name: 'Main',
+        buttons: [
+          DeckButton(id: 'a', label: 'First', action: MediaAction('previous')),
+          DeckButton(id: 'b', label: 'Second', action: MediaAction('next')),
+        ],
+      ),
+    ]);
+    await tester.pumpWidget(host(editing: true, shown: two));
+
+    final drag = await tester.startGesture(
+      tester.getCenter(find.text('Second')),
+    );
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+    await drag.moveTo(tester.getCenter(find.text('First')));
+    await tester.pump();
+    await drag.up();
+    await tester.pumpAndSettle();
+
+    expect([for (final b in changed!.pages[0].buttons) b.id], ['b', 'a']);
   });
 
   testWidgets('adds a page in edit mode', (tester) async {

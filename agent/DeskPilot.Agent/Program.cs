@@ -20,11 +20,14 @@ var stats = new Feed<PcStats>(TimeSpan.FromSeconds(1), () =>
     statsReader.Read() with { CpuTemp = hardwareMonitor.CpuTemp(), Fps = fps.Read() });
 using var assettoCorsa = new AssettoCorsaReader(TimeProvider.System);
 var telemetry = new Feed<SimTelemetry>(TimeSpan.FromMilliseconds(33), assettoCorsa.Read);
+var media = new Feed<NowPlaying>(TimeSpan.FromSeconds(1), new NowPlayingReader(TimeProvider.System).Read);
 
-var app = AgentServer.Create(AgentServer.DefaultPort, new AgentServices(security, decks, stats, telemetry, Actions.RunAsync));
+var app = AgentServer.Create(AgentServer.DefaultPort,
+    new AgentServices(security, decks, stats, telemetry, media, Actions.RunAsync));
 await app.StartAsync();
 _ = stats.RunAsync(app.Logger, app.Lifetime.ApplicationStopping);
 _ = telemetry.RunAsync(app.Logger, app.Lifetime.ApplicationStopping);
+_ = media.RunAsync(app.Logger, app.Lifetime.ApplicationStopping);
 
 Console.WriteLine($"DeskPilot is running on {Environment.MachineName}. Paired phones: {security.Phones.Count}.");
 Console.WriteLine("Press Enter to pair a phone. Type forget and press Enter to unpair every phone. Press Ctrl+C to stop.");

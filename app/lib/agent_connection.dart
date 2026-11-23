@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:deskpilot/deck.dart';
+import 'package:deskpilot/now_playing.dart';
 import 'package:deskpilot/pairing.dart';
 
 const _connectTimeout = Duration(seconds: 3);
@@ -122,6 +123,9 @@ class AgentConnection {
   void press(String id) => _send({'type': 'press', 'id': id});
 
   /// Asks the PC to keep this deck. It checks it and sends it to every phone.
+  /// Presses a media key on the PC, for the music card's buttons.
+  void mediaKey(String media) => _send({'type': 'mediaKey', 'media': media});
+
   void saveDeck(Deck deck) =>
       _send({'type': 'saveDeck', 'deck': deck.toJson()});
 
@@ -157,6 +161,13 @@ final class TelemetryChanged extends AgentEvent {
   final Map<String, double> telemetry;
 }
 
+/// What the PC is playing, or null when nothing is.
+final class MediaChanged extends AgentEvent {
+  const MediaChanged(this.media);
+
+  final NowPlaying? media;
+}
+
 /// A message for the user, usually why something didn't work.
 final class PcSays extends AgentEvent {
   const PcSays(this.text);
@@ -184,6 +195,12 @@ AgentEvent readEvent(String message) {
       StatsChanged(_numbers(stats)),
     {'type': 'telemetry', 'telemetry': final Map<String, Object?> telemetry} =>
       TelemetryChanged(_numbers(telemetry)),
+    {'type': 'media'} => MediaChanged(
+      NowPlaying.fromJson(
+        (json as Map<String, Object?>)['media'],
+        DateTime.now(),
+      ),
+    ),
     {'type': 'error', 'message': final String text} => PcSays(text),
     _ => const PcSays('Unexpected message from the PC'),
   };

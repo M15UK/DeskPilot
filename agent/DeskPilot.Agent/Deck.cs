@@ -28,7 +28,15 @@ public sealed record StatAction(string Stat, string Style) : ButtonAction
     public static readonly FrozenSet<string> Styles = new[] { "number", "gauge", "chart" }.ToFrozenSet();
 }
 
-public sealed record DeckButton(string Id, string Label, ButtonAction Action);
+/// <summary>
+/// A button on a page. <paramref name="Icon"/> names an icon the phone app knows, and <paramref name="Color"/> is one
+/// of <see cref="Colors"/>. Left out, the phone picks both from what the button does.
+/// </summary>
+public sealed record DeckButton(string Id, string Label, ButtonAction Action, string? Icon = null, string? Color = null)
+{
+    public static readonly FrozenSet<string> Colors =
+        new[] { "red", "amber", "green", "teal", "blue", "purple", "pink", "gray" }.ToFrozenSet();
+}
 
 public sealed record DeckPage(string Name, IReadOnlyList<DeckButton> Buttons);
 
@@ -49,6 +57,8 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
         AllowOutOfOrderMetadataProperties = true,
         RespectNullableAnnotations = true,
         RespectRequiredConstructorParameters = true,
+        // A button without its own icon or color leaves them out instead of writing null.
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
     public static Deck Default { get; } = new([new DeckPage("Main",
@@ -126,6 +136,11 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
                 {
                     return $"Every button needs a label of 1 to {MaxTextLength} characters.";
                 }
+                if (button.Icon is not null && !IsIconName(button.Icon)
+                    || button.Color is not null && !DeckButton.Colors.Contains(button.Color))
+                {
+                    return $"The button \"{button.Label}\" has an icon or color DeskPilot doesn't know.";
+                }
                 if (!CanRun(button.Action))
                 {
                     return $"DeskPilot can't run the button \"{button.Label}\". Check its keys or what it opens.";
@@ -136,6 +151,9 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
     }
 
     static bool IsShortText(string text) => !string.IsNullOrWhiteSpace(text) && text.Length <= MaxTextLength;
+
+    static bool IsIconName(string icon) =>
+        icon.Length is > 0 and <= MaxTextLength && icon.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '_');
 
     static bool CanRun(ButtonAction action) => action switch
     {

@@ -4,8 +4,11 @@ import 'dart:math';
 import 'package:deskpilot/agent_connection.dart';
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/deck_view.dart';
+import 'package:deskpilot/look.dart';
+import 'package:deskpilot/now_playing.dart';
 import 'package:deskpilot/pairing.dart';
 import 'package:deskpilot/scan_page.dart';
+import 'package:deskpilot/tiles.dart';
 import 'package:flutter/material.dart';
 
 void main() => runApp(const DeskPilotApp());
@@ -20,10 +23,7 @@ class DeskPilotApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'DeskPilot',
-    theme: ThemeData(
-      colorSchemeSeed: Colors.indigo,
-      brightness: Brightness.dark,
-    ),
+    theme: deckTheme,
     home: DeckPage(store: store),
   );
 }
@@ -45,6 +45,7 @@ class _DeckPageState extends State<DeckPage> {
   Map<String, double> _telemetry = const {};
   DateTime _telemetryAt = DateTime(0);
   Map<String, List<double>> _history = const {};
+  NowPlaying? _media;
   int _page = 0;
   bool _editing = false;
   bool _loading = true;
@@ -140,6 +141,8 @@ class _DeckPageState extends State<DeckPage> {
           }
           _stats = stats;
           _history = _withReadings(_history, {...stats, ..._telemetry});
+        case MediaChanged(:final media):
+          _media = media?.withCoverFrom(_media);
         case TelemetryChanged(:final telemetry):
           _telemetry = telemetry;
           _telemetryAt = DateTime.now();
@@ -168,6 +171,7 @@ class _DeckPageState extends State<DeckPage> {
       _stats = const {};
       _telemetry = const {};
       _history = const {};
+      _media = null;
       _page = 0;
       _editing = false;
       _busy = false;
@@ -187,6 +191,7 @@ class _DeckPageState extends State<DeckPage> {
       _agent = null;
       _stats = const {};
       _telemetry = const {};
+      _media = null;
       _status = 'Lost the connection to ${agent.pcName}';
     });
   }
@@ -261,6 +266,8 @@ class _DeckPageState extends State<DeckPage> {
   Widget _deckView() {
     final deck = _deck;
     final agent = _agent;
+    final media = _media;
+    final page = deck == null ? 0 : min(_page, deck.pages.length - 1);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -273,12 +280,17 @@ class _DeckPageState extends State<DeckPage> {
           ),
         ],
         const SizedBox(height: 12),
+        // The music card sits on top of the first page, like a home screen.
+        if (media != null && page == 0 && !_editing) ...[
+          NowPlayingCard(media: media, onKey: agent?.mediaKey),
+          const SizedBox(height: 12),
+        ],
         Expanded(
           child: deck == null
               ? const SizedBox.shrink()
               : DeckView(
                   deck: deck,
-                  page: min(_page, deck.pages.length - 1),
+                  page: page,
                   editing: _editing,
                   onPress: agent?.press,
                   onChange: _save,

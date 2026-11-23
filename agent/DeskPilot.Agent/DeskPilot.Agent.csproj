@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net11.0</TargetFramework>
+    <!-- On Windows the agent also reads what music is playing from Windows' media session, which needs the Windows SDK. -->
+    <TargetFramework Condition="'$(OS)' == 'Windows_NT'">net11.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework Condition="'$(OS)' != 'Windows_NT'">net11.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- Reading Windows' frame events (EtwFrames) needs pointers into the event records. -->

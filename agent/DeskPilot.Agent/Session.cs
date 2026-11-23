@@ -17,6 +17,9 @@ sealed class Session(WebSocket socket, AgentServices services, ILogger logger, C
     readonly SemaphoreSlim sendLock = new(1, 1);
     // Telemetry arrives 30 times a second; on a slow link, drop a reading rather than queue them up.
     int sendingTelemetry;
+    // The music card changes rarely and its cover is big: send only changes, and each cover once.
+    string? sentMedia;
+    string? sentCoverId;
 
     public async Task RunAsync(IPAddress? address)
     {
@@ -46,6 +49,7 @@ sealed class Session(WebSocket socket, AgentServices services, ILogger logger, C
         services.Decks.Changed += OnDeckChanged;
         services.Stats.Updated += OnStats;
         services.Telemetry.Updated += OnTelemetry;
+        services.Media.Updated += OnMedia;
         try
         {
             await SendAsync(AgentServer.DeckMessage(services.Decks.Current));
@@ -59,6 +63,7 @@ sealed class Session(WebSocket socket, AgentServices services, ILogger logger, C
         }
         finally
         {
+            services.Media.Updated -= OnMedia;
             services.Telemetry.Updated -= OnTelemetry;
             services.Stats.Updated -= OnStats;
             services.Decks.Changed -= OnDeckChanged;
@@ -77,6 +82,20 @@ sealed class Session(WebSocket socket, AgentServices services, ILogger logger, C
             return;
         }
         _ = SendTelemetryAsync(AgentServer.TelemetryMessage(telemetry));
+    }
+
+    void OnMedia(NowPlaying media)
+    {
+        // The media feed calls this once a second from one timer, never twice at the same time.
+        var withoutCover = AgentServer.MediaMessage(media, withCover: false);
+        if (withoutCover == sentMedia)
+        {
+            return;
+        }
+        var newCover = media.CoverId != sentCoverId;
+        sentMedia = withoutCover;
+        sentCoverId = media.CoverId;
+        _ = SendQuietlyAsync(newCover ? AgentServer.MediaMessage(media, withCover: true) : withoutCover);
     }
 
     async Task SendTelemetryAsync(string json)
