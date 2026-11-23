@@ -147,7 +147,7 @@ public class PairingQrTests
 
         using var json = JsonDocument.Parse(text);
         var root = json.RootElement;
-        Assert.Equal(2, root.GetProperty("deskpilot").GetInt32());
+        Assert.Equal(3, root.GetProperty("deskpilot").GetInt32());
         Assert.Equal("GAMING-PC", root.GetProperty("name").GetString());
         Assert.Equal(["192.168.1.50", "10.0.0.7"], root.GetProperty("hosts").EnumerateArray().Select(h => h.GetString()));
         Assert.Equal(8740, root.GetProperty("port").GetInt32());

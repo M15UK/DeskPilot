@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:deskpilot/agent_connection.dart';
+import 'package:deskpilot/deck.dart';
+import 'package:deskpilot/deck_view.dart';
 import 'package:deskpilot/pairing.dart';
 import 'package:deskpilot/scan_page.dart';
 import 'package:flutter/material.dart';
@@ -35,6 +38,9 @@ class DeckPage extends StatefulWidget {
 class _DeckPageState extends State<DeckPage> {
   SavedPc? _saved;
   AgentConnection? _agent;
+  Deck? _deck;
+  int _page = 0;
+  bool _editing = false;
   bool _loading = true;
   bool _busy = false;
   String _status = '';
@@ -95,8 +101,8 @@ class _DeckPageState extends State<DeckPage> {
         return;
       }
       final connected = agent;
-      connected.statuses().listen(
-        _show,
+      connected.events().listen(
+        (event) => _onEvent(connected, event),
         onError: (Object _) => _lost(connected),
         onDone: () => _lost(connected),
       );
@@ -115,12 +121,36 @@ class _DeckPageState extends State<DeckPage> {
     }
   }
 
+  void _onEvent(AgentConnection from, AgentEvent event) {
+    if (!mounted || _agent != from) return;
+    setState(() {
+      switch (event) {
+        case DeckChanged(:final deck):
+          _deck = deck;
+        case PcSays(:final text):
+          _status = text;
+      }
+    });
+  }
+
+  void _save(Deck deck) {
+    final agent = _agent;
+    if (agent == null) {
+      _show('Connect to the PC to save changes.');
+      return;
+    }
+    agent.saveDeck(deck);
+  }
+
   Future<void> _forget() async {
     _attempt++;
     final agent = _agent;
     setState(() {
       _agent = null;
       _saved = null;
+      _deck = null;
+      _page = 0;
+      _editing = false;
       _busy = false;
       _status = '';
     });
@@ -153,6 +183,12 @@ class _DeckPageState extends State<DeckPage> {
       appBar: AppBar(
         title: const Text('DeskPilot'),
         actions: [
+          if (saved != null && _deck != null)
+            IconButton(
+              onPressed: () => setState(() => _editing = !_editing),
+              tooltip: _editing ? 'Done editing' : 'Edit the deck',
+              icon: Icon(_editing ? Icons.check : Icons.edit),
+            ),
           if (saved != null)
             IconButton(
               onPressed: _forget,
@@ -163,7 +199,7 @@ class _DeckPageState extends State<DeckPage> {
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : saved == null
@@ -201,24 +237,34 @@ class _DeckPageState extends State<DeckPage> {
     ],
   );
 
-  Widget _deckView() => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Text(_status, textAlign: TextAlign.center),
-      if (_agent == null && !_busy) ...[
+  Widget _deckView() {
+    final deck = _deck;
+    final agent = _agent;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(_status, textAlign: TextAlign.center),
+        if (agent == null && !_busy) ...[
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: _signIn,
+            child: const Text('Connect again'),
+          ),
+        ],
         const SizedBox(height: 12),
-        OutlinedButton(onPressed: _signIn, child: const Text('Connect again')),
-      ],
-      const Spacer(),
-      SizedBox(
-        height: 160,
-        child: FilledButton.icon(
-          onPressed: _agent?.playPause,
-          icon: const Icon(Icons.play_arrow_rounded, size: 48),
-          label: const Text('Play / Pause', style: TextStyle(fontSize: 24)),
+        Expanded(
+          child: deck == null
+              ? const SizedBox.shrink()
+              : DeckView(
+                  deck: deck,
+                  page: min(_page, deck.pages.length - 1),
+                  editing: _editing,
+                  onPress: agent?.press,
+                  onChange: _save,
+                  onPageChanged: (page) => setState(() => _page = page),
+                ),
         ),
-      ),
-      const Spacer(),
-    ],
-  );
+      ],
+    );
+  }
 }

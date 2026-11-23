@@ -4,8 +4,9 @@
 [![PC app](https://github.com/M15UK/DeskPilot/actions/workflows/agent.yml/badge.svg)](https://github.com/M15UK/DeskPilot/actions/workflows/agent.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Status: step 2 of 8 is done. Your phone pairs with your PC by QR code and presses Play/Pause over an
-encrypted connection. Follow along in the [build plan](docs/PLAN.md).**
+**Status: step 3 of 8 is done. Your phone shows a deck of buttons you set up yourself: media keys, key
+combos and macros, and buttons that open apps and websites. Follow along in the
+[build plan](docs/PLAN.md).**
 
 DeskPilot turns your phone into a control deck for your gaming PC. Tap buttons to control music,
 Discord and your games, and see live PC stats like temperature and FPS. It is made for gamers and
@@ -105,12 +106,30 @@ There is no app download yet, so you install it from a computer that has Flutter
 
 The app remembers your PC and connects by itself the next time you open it.
 
-To run the tests, use `dotnet test agent/DeskPilot.slnx` (27 tests) and `flutter test` in the app
-folder (13 tests).
+### Make the deck yours
+
+Tap the pencil at the top. Then:
+
+* Tap **Add button**, give it a label and pick what it does:
+  * **Media:** play or pause, next, previous, volume up, volume down or mute.
+  * **Keys:** a key combo like `Ctrl+Shift+M`. Type several with commas, like `Ctrl+C, Alt+Tab, Ctrl+V`,
+    and they run one after another as a macro.
+  * **Open:** an app, file, folder or website, like `C:\Games\game.exe` or `steam://rungameid/244210`.
+* Tap a button to change it, move it, or delete it.
+* Use **Add page** and **Page settings** to make pages, like one for music and one per game.
+
+Tap the check mark when you're done. The deck lives on your PC, so every paired phone shows the same
+buttons.
+
+To run the tests, use `dotnet test agent/DeskPilot.slnx` (55 tests) and `flutter test` in the app
+folder (28 tests).
 
 ## Limits
 
-* Play/Pause works on Windows only for now. On a Mac or Linux PC, the app tells you so.
+* Media and key buttons work on Windows only for now. Open buttons also work on a Mac.
+* Key buttons can't reach a game or app that runs as administrator, unless DeskPilot runs as
+  administrator too.
+* A paired phone can make buttons that open any app on your PC, so only pair your own phones.
 * If your PC's address on the network changes, scan a new QR code.
 * **Forget this PC** in the app only removes the PC from your phone. To lock a phone out of your PC,
   type `forget` in the PC window.

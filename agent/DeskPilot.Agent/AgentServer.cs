@@ -1,7 +1,5 @@
-using System.Net;
 using System.Net.WebSockets;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using System.Text.Json;
 
 namespace DeskPilot.Agent;
@@ -16,11 +14,11 @@ public sealed record SignInResult(bool Allowed, IReadOnlyList<string> Replies);
 public static class AgentServer
 {
     public const int DefaultPort = 8740;
-    public const int MaxMessageBytes = 4096;
-    public const int ProtocolVersion = 2;
-    static readonly TimeSpan SignInTimeout = TimeSpan.FromSeconds(10);
+    public const int MaxSignInBytes = 4096;
+    public const int MaxMessageBytes = 1024 * 1024;
+    public const int ProtocolVersion = 3;
 
-    public static WebApplication Create(int port, AgentSecurity security, Action playPause)
+    public static WebApplication Create(int port, AgentSecurity security, DeckStore decks, Func<ButtonAction, Task> run)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.ConfigureKestrel(kestrel =>
@@ -36,10 +34,10 @@ public static class AgentServer
                 return;
             }
             using var socket = await context.WebSockets.AcceptWebSocketAsync();
+            var session = new Session(socket, security, decks, run, app.Logger, context.RequestAborted);
             try
             {
-                await RunSessionAsync(socket, security, playPause, app.Logger,
-                    context.Connection.RemoteIpAddress, context.RequestAborted);
+                await session.RunAsync(context.Connection.RemoteIpAddress);
             }
             catch (Exception e) when (e is WebSocketException or OperationCanceledException)
             {
@@ -68,97 +66,45 @@ public static class AgentServer
     }
 
     /// <summary>Runs one message from a signed in phone and returns the reply, or null when there is none.</summary>
-    public static string? Handle(ReadOnlySpan<byte> message, Action playPause)
+    public static async Task<string?> HandleAsync(ReadOnlyMemory<byte> message, DeckStore decks, Func<ButtonAction, Task> run)
     {
-        var request = ParseObject(message);
-        if (Text(request, "type") != "media" || Text(request, "action") != "playPause")
+        var request = ParseObject(message.Span);
+        switch (Text(request, "type"))
         {
-            return Error("Unknown message");
-        }
-        try
-        {
-            playPause();
-            return null;
-        }
-        catch (PlatformNotSupportedException e)
-        {
-            return Error(e.Message);
-        }
-    }
-
-    static async Task RunSessionAsync(WebSocket socket, AgentSecurity security, Action playPause, ILogger logger,
-        IPAddress? address, CancellationToken cancel)
-    {
-        var buffer = new byte[MaxMessageBytes];
-        byte[]? first;
-        using (var signInTime = CancellationTokenSource.CreateLinkedTokenSource(cancel))
-        {
-            signInTime.CancelAfter(SignInTimeout);
-            first = await ReceiveAsync(socket, buffer, signInTime.Token);
-        }
-        if (first is null)
-        {
-            return;
-        }
-        var signIn = SignIn(first, security);
-        foreach (var reply in signIn.Replies)
-        {
-            await SendAsync(socket, reply, cancel);
-        }
-        if (!signIn.Allowed)
-        {
-            logger.LogWarning("Refused a device at {Address} that is not paired", address);
-            await socket.CloseOutputAsync(WebSocketCloseStatus.PolicyViolation, "Not paired", cancel);
-            return;
-        }
-
-        logger.LogInformation("Phone connected from {Address}", address);
-        try
-        {
-            while (await ReceiveAsync(socket, buffer, cancel) is { } message)
-            {
-                var reply = HandleSafely(message, playPause, logger);
-                if (reply is not null)
+            case "press" when Text(request, "id") is { } id:
+                if (decks.Current.Find(id) is not { } button)
                 {
-                    await SendAsync(socket, reply, cancel);
+                    return Error("That button is not on the deck any more.");
                 }
-            }
-        }
-        finally
-        {
-            logger.LogInformation("Phone disconnected");
+                try
+                {
+                    await run(button.Action);
+                    return null;
+                }
+                catch (PlatformNotSupportedException e)
+                {
+                    return Error(e.Message);
+                }
+            case "saveDeck" when request is { } body && body.TryGetProperty("deck", out var json):
+                if (Deck.Read(json, out var problem) is not { } deck)
+                {
+                    return Error(problem!);
+                }
+                decks.Save(deck);
+                return null;
+            default:
+                return Error("Unknown message");
         }
     }
 
-    /// <summary>Reads one message. Returns null after closing, when the phone closed or sent too much.</summary>
-    static async Task<byte[]?> ReceiveAsync(WebSocket socket, byte[] buffer, CancellationToken cancel)
-    {
-        var result = await socket.ReceiveAsync(buffer, cancel);
-        if (result.MessageType == WebSocketMessageType.Close)
-        {
-            await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, null, cancel);
-            return null;
-        }
-        if (!result.EndOfMessage)
-        {
-            await socket.CloseOutputAsync(WebSocketCloseStatus.MessageTooBig, "Message too big", cancel);
-            return null;
-        }
-        return buffer[..result.Count];
-    }
+    internal static string DeckMessage(Deck deck) => JsonSerializer.Serialize(new { type = "deck", deck }, Deck.Json);
 
-    static string? HandleSafely(byte[] message, Action playPause, ILogger logger)
-    {
-        try
-        {
-            return Handle(message, playPause);
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "An action from the phone failed");
-            return Error("That did not work on the PC. The DeskPilot window shows why.");
-        }
-    }
+    internal static string Error(string message) => JsonSerializer.Serialize(new { type = "error", message });
+
+    static string Hello() =>
+        JsonSerializer.Serialize(new { type = "hello", name = Environment.MachineName, version = ProtocolVersion });
+
+    static string Paired(string key) => JsonSerializer.Serialize(new { type = "paired", key });
 
     static JsonElement? ParseObject(ReadOnlySpan<byte> message)
     {
@@ -177,14 +123,4 @@ public static class AgentServer
         json is { } value && value.TryGetProperty(name, out var field) && field.ValueKind == JsonValueKind.String
             ? field.GetString()
             : null;
-
-    static string Hello() =>
-        JsonSerializer.Serialize(new { type = "hello", name = Environment.MachineName, version = ProtocolVersion });
-
-    static string Paired(string key) => JsonSerializer.Serialize(new { type = "paired", key });
-
-    static string Error(string message) => JsonSerializer.Serialize(new { type = "error", message });
-
-    static Task SendAsync(WebSocket socket, string json, CancellationToken cancel) =>
-        socket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, endOfMessage: true, cancel);
 }

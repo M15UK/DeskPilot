@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/pairing.dart';
 
 const _connectTimeout = Duration(seconds: 3);
@@ -108,32 +109,63 @@ class AgentConnection {
     }
   }
 
-  /// What the PC says from now on, as text for the status line.
-  /// Listen once; it ends when the connection closes.
-  Stream<String> statuses() async* {
+  /// What the PC sends from now on: the deck first, then any changes and
+  /// messages. Listen once; it ends when the connection closes.
+  Stream<AgentEvent> events() async* {
     while (await _messages.moveNext()) {
       final message = _messages.current;
-      if (message is String) yield describe(message);
+      if (message is String) yield readEvent(message);
     }
   }
 
-  void playPause() =>
-      _socket.add(jsonEncode({'type': 'media', 'action': 'playPause'}));
+  /// Runs the deck button with this id on the PC.
+  void press(String id) => _send({'type': 'press', 'id': id});
+
+  /// Asks the PC to keep this deck. It checks it and sends it to every phone.
+  void saveDeck(Deck deck) =>
+      _send({'type': 'saveDeck', 'deck': deck.toJson()});
+
+  void _send(Map<String, Object> message) => _socket.add(jsonEncode(message));
 
   Future<void> close() => _socket.close();
 }
 
-/// Turns one message from the PC into text for the status line.
-String describe(String message) {
+/// Something the PC sent after signing in.
+sealed class AgentEvent {
+  const AgentEvent();
+}
+
+/// The deck, after signing in and each time it changes.
+final class DeckChanged extends AgentEvent {
+  const DeckChanged(this.deck);
+
+  final Deck deck;
+}
+
+/// A message for the user, usually why something didn't work.
+final class PcSays extends AgentEvent {
+  const PcSays(this.text);
+
+  final String text;
+}
+
+AgentEvent readEvent(String message) {
   final Object? json;
   try {
     json = jsonDecode(message);
   } on FormatException {
-    return 'Unexpected message from the PC';
+    return const PcSays('Unexpected message from the PC');
   }
   return switch (json) {
-    {'type': 'hello', 'name': final String name} => 'Connected to $name',
-    {'type': 'error', 'message': final String text} => text,
-    _ => 'Unexpected message from the PC',
+    {'type': 'deck', 'deck': final Object? deck} => switch (Deck.fromJson(
+      deck,
+    )) {
+      final Deck read => DeckChanged(read),
+      null => const PcSays(
+        "The PC sent a deck this app can't show. Update the app.",
+      ),
+    },
+    {'type': 'error', 'message': final String text} => PcSays(text),
+    _ => const PcSays('Unexpected message from the PC'),
   };
 }

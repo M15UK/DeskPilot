@@ -62,7 +62,7 @@ Each phase ends with something working on your phone.
    works. This proves the whole path end to end.
 2. **Pairing and security (done):** QR pairing, TLS with the pinned certificate, the key kept in the phone's secure storage,
    USB through `adb reverse`.
-3. **The deck:** button grid, pages, edit mode on the phone, actions (keys, macros, open app or website, media,
+3. **The deck (done):** button grid, pages, edit mode on the phone, actions (keys, macros, open app or website, media,
    volume).
 4. **PC stats:** CPU, GPU and RAM usage, temperatures, FPS; widgets for a number tile, a gauge and a small chart.
 5. **Gaming:** Assetto Corsa dashboard, game button boxes that switch automatically, game launcher, Discord controls.

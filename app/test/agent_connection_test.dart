@@ -1,12 +1,13 @@
 import 'dart:io';
 
 import 'package:deskpilot/agent_connection.dart';
+import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/pairing.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_pc.dart';
 
-const hello = {'type': 'hello', 'name': 'GAMING-PC', 'version': 2};
+const hello = {'type': 'hello', 'name': 'GAMING-PC', 'version': 3};
 
 void main() {
   FakePc? pc;
@@ -36,8 +37,17 @@ void main() {
     expect(agent.key, 'new-key');
     expect(agent.pcName, 'GAMING-PC');
     expect(await fake.nextMessage(), {'type': 'pair', 'code': 'code123'});
-    agent.playPause();
-    expect(await fake.nextMessage(), {'type': 'media', 'action': 'playPause'});
+    agent.press('play-pause');
+    expect(await fake.nextMessage(), {'type': 'press', 'id': 'play-pause'});
+    agent.saveDeck(const Deck([DeckPage(name: 'Racing', buttons: [])]));
+    expect(await fake.nextMessage(), {
+      'type': 'saveDeck',
+      'deck': {
+        'pages': [
+          {'name': 'Racing', 'buttons': <Object>[]},
+        ],
+      },
+    });
   });
 
   test('signs in with the saved key', () async {
@@ -103,13 +113,53 @@ void main() {
     );
   });
 
-  test('shows errors from the PC and ignores anything else', () {
-    expect(
-      describe('{"type":"error","message":"Play/Pause works on Windows."}'),
-      'Play/Pause works on Windows.',
+  test('the deck arrives after signing in', () async {
+    final fake = pc = await FakePc.start(
+      (_) => [
+        hello,
+        {
+          'type': 'deck',
+          'deck': {
+            'pages': [
+              {'name': 'Main', 'buttons': <Object>[]},
+            ],
+          },
+        },
+      ],
     );
-    expect(describe('not json'), 'Unexpected message from the PC');
-    expect(describe('[1, 2]'), 'Unexpected message from the PC');
-    expect(describe('{"type":"surprise"}'), 'Unexpected message from the PC');
+
+    final agent = await AgentConnection.signIn((
+      pc: infoFor(fake),
+      key: 'saved-key',
+    ));
+    addTearDown(agent.close);
+
+    final first = await agent.events().first;
+    expect(first, isA<DeckChanged>());
+    expect((first as DeckChanged).deck.pages.single.name, 'Main');
+  });
+
+  test('reads what the PC says', () {
+    expect(
+      readEvent('{"type":"error","message":"Key buttons work on Windows."}'),
+      isA<PcSays>().having(
+        (e) => e.text,
+        'text',
+        'Key buttons work on Windows.',
+      ),
+    );
+    expect(
+      readEvent('{"type":"deck","deck":{"pages":[]}}'),
+      isA<PcSays>(),
+      reason: 'a deck the app cannot show',
+    );
+    expect(
+      readEvent('not json'),
+      isA<PcSays>().having(
+        (e) => e.text,
+        'text',
+        'Unexpected message from the PC',
+      ),
+    );
   });
 }

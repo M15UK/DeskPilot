@@ -11,7 +11,9 @@ var security = new AgentSecurity(
     new PairingCodes(TimeProvider.System),
     new PairedPhones(Path.Combine(folder, "phones.json")));
 
-var app = AgentServer.Create(AgentServer.DefaultPort, security, Media.PlayPause);
+var decks = new DeckStore(Path.Combine(folder, "deck.json"));
+
+var app = AgentServer.Create(AgentServer.DefaultPort, security, decks, Actions.RunAsync);
 await app.StartAsync();
 
 Console.WriteLine($"DeskPilot is running on {Environment.MachineName}. Paired phones: {security.Phones.Count}.");
