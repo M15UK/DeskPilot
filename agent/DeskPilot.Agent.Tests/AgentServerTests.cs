@@ -188,11 +188,13 @@ public class ServerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task OversizedMessageClosesTheConnection()
+    public async Task AnOversizedFirstMessageClosesTheConnection()
     {
         using var phone = await ConnectAsync();
 
-        await phone.SendAsync(new byte[AgentServer.MaxMessageBytes + 1], WebSocketMessageType.Text,
+        // Just over the limit: a much bigger message can still be sending when the PC hangs up,
+        // and Windows then fails the send instead of showing the close.
+        await phone.SendAsync(new byte[AgentServer.MaxSignInBytes + 1], WebSocketMessageType.Text,
             endOfMessage: true, Timeout());
         var result = await phone.ReceiveAsync(new byte[256], Timeout());
 
