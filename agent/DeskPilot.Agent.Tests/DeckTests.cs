@@ -133,7 +133,8 @@ public class DeckTests
             """{"pages":[{"name":"Home","buttons":[""" +
             """{"id":"m","label":"Music","action":{"kind":"music"},"size":"wider"},""" +
             """{"id":"c","label":"Clock","action":{"kind":"clock"},"size":"huge"},""" +
-            """{"id":"p","label":"Photos","action":{"kind":"photos","pictures":["0123456789abcdef"]},"size":"big"}""" +
+            """{"id":"p","label":"Photos","action":{"kind":"photos","pictures":["0123456789abcdef"]},"size":"big"},""" +
+            """{"id":"t","label":"Tyres","action":{"kind":"tyres"}}""" +
             """]}]}""";
 
         var deck = Deck.Read(JsonDocument.Parse(json).RootElement, out var problem);

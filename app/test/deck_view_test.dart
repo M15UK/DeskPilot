@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/deck_view.dart';
 import 'package:deskpilot/now_playing.dart';
+import 'package:deskpilot/tile_grid.dart';
 import 'package:deskpilot/tiles.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -211,6 +212,19 @@ void main() {
     expect(added.label, 'Mute Discord');
     expect((added.action as KeysAction).combos, ['Ctrl+Shift+M', 'Alt+Tab']);
     expect(changed!.pages[0].buttons, hasLength(2));
+  });
+
+  testWidgets('Add button sits in the rail, not in the grid', (tester) async {
+    await tester.pumpWidget(host(editing: true));
+
+    expect(find.text('Add button'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('Add button'),
+        matching: find.byType(TileGrid),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('an empty label names the button after what it does', (
@@ -667,6 +681,47 @@ void main() {
     expect(formatStat('fps', null), '—');
     expect(statMaximum('fps'), 240);
     expect(statMaximum('cpuLoad'), 100);
+  });
+
+  test('racing page readings read naturally', () {
+    expect(formatStat('delta', -0.214), '−0.214');
+    expect(formatStat('delta', 0.5), '+0.500');
+    expect(formatStat('tyreFlPressure', 27.6), '27.6 psi');
+    expect(formatStat('flag', 2), 'Yellow');
+    expect(formatStat('flag', 0), 'None');
+    expect(formatStat('pitLimiter', 1), 'On');
+    expect(formatStat('lapsOfFuel', 11.6), '11.6 laps');
+    expect(formatStat('fuelToFinish', 4.3), '+4.3 L');
+    expect(formatStat('sector', 2), 'S2');
+  });
+
+  testWidgets('the tyres tile shows each tyre and its pressure', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SizedBox.square(
+            dimension: 300,
+            child: TyresTile(
+              stats: {
+                'tyreFlTemp': 84,
+                'tyreFrTemp': 97,
+                'tyreRlTemp': 68,
+                'tyreRrTemp': 86,
+                'tyreFlPressure': 27.6,
+                'tyreRrPressure': 27.3,
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('84°'), findsOneWidget);
+    expect(find.text('97°'), findsOneWidget);
+    expect(find.text('27.6'), findsOneWidget);
+    expect(find.text('27.3'), findsOneWidget);
   });
 
   test('sim racing readings read like a race dash', () {

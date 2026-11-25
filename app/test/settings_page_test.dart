@@ -63,6 +63,27 @@ void main() {
     expect(saved.fullScreen, isTrue);
   });
 
+  testWidgets('adds a ready Racing page', (tester) async {
+    var added = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsPage(
+          settings: const AppSettings(),
+          onChanged: (_) {},
+          pcName: 'GAMING-PC',
+          onForget: () {},
+          onAddRacingPage: () => added = true,
+        ),
+      ),
+    );
+
+    final button = find.text('Add a Racing page');
+    await tester.scrollUntilVisible(button, 200);
+    await tester.tap(button);
+
+    expect(added, isTrue);
+  });
+
   testWidgets('puts music and clock on the first page', (tester) async {
     var added = false;
     await tester.pumpWidget(

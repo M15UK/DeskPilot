@@ -11,6 +11,34 @@ const statHistoryLength = 60;
 
 /// How a reading looks on a tile: 41°C, 24%, or a dash when the PC can't
 /// tell.
+const _flags = {
+  0: 'None',
+  1: 'Blue',
+  2: 'Yellow',
+  3: 'Black',
+  4: 'White',
+  5: 'Chequered',
+  6: 'Penalty',
+};
+
+/// A reading whose color tells you something: delta green when faster and
+/// red when slower, the flag in its own color, the pit limiter green when on.
+/// Null keeps the usual text color.
+Color? readingColor(String stat, double? value) => switch ((stat, value)) {
+  ('delta', final double delta) =>
+    delta < 0 ? deckColors['green'] : deckColors['red'],
+  ('pitLimiter' || 'inPitLane', final double on) when on > 0 =>
+    deckColors['green'],
+  ('flag', final double flag) => switch (flag.round()) {
+    1 => deckColors['blue'],
+    2 => deckColors['amber'],
+    3 || 6 => deckColors['red'],
+    4 => Colors.white,
+    _ => null,
+  },
+  _ => null,
+};
+
 String formatStat(String stat, double? value) => switch ((stat, value)) {
   (_, null) => '—',
   ('gear', final double gear) =>
@@ -19,6 +47,17 @@ String formatStat(String stat, double? value) => switch ((stat, value)) {
     seconds,
   ),
   ('position', final double position) => 'P${position.round()}',
+  ('delta', final double delta) =>
+    '${delta < 0 ? '−' : '+'}${delta.abs().toStringAsFixed(3)}',
+  ('pitLimiter' || 'inPitLane', final double on) => on > 0 ? 'On' : 'Off',
+  ('flag', final double flag) => _flags[flag.round()] ?? 'None',
+  ('sector', final double sector) => 'S${sector.round()}',
+  ('lastSector', final double seconds) => _lapTime(seconds),
+  ('fuelPerLap', final double litres) => '${litres.toStringAsFixed(2)} L',
+  ('lapsOfFuel', final double laps) => '${laps.toStringAsFixed(1)} laps',
+  ('fuelToFinish', final double litres) => '+${litres.toStringAsFixed(1)} L',
+  (final name, final double psi) when name.endsWith('Pressure') =>
+    '${psi.toStringAsFixed(1)} psi',
   ('fuel', final double litres) => '${litres.toStringAsFixed(1)} L',
   (final name, final double value) when name.endsWith('Temp') =>
     '${value.round()}°C',
@@ -225,7 +264,7 @@ class StatTile extends StatelessWidget {
     final reading = Text(
       formatStat(action.stat, value),
       style: TextStyle(
-        color: DeckLook.of(context).text,
+        color: readingColor(action.stat, value) ?? DeckLook.of(context).text,
         fontSize: 26,
         fontWeight: FontWeight.w600,
       ),
@@ -531,6 +570,89 @@ class _PhotosTileState extends State<PhotosTile> {
                 ),
               ),
             ),
+    );
+  }
+}
+
+/// The sim car's four tyres from above: each colored by its temperature
+/// (blue cold, green right, amber hot, red too hot), with its pressure.
+class TyresTile extends StatelessWidget {
+  const TyresTile({super.key, required this.stats});
+
+  final Map<String, double> stats;
+
+  static Color _heat(double? temp) => switch (temp) {
+    null => const Color(0xFF2A3040),
+    < 70 => deckColors['blue']!,
+    <= 95 => deckColors['green']!,
+    <= 105 => deckColors['amber']!,
+    _ => deckColors['red']!,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final look = DeckLook.of(context);
+    Widget tyre(String corner) {
+      final temp = stats['tyre${corner}Temp'];
+      final psi = stats['tyre${corner}Pressure'];
+      final color = _heat(temp);
+      final ink = Color.lerp(color, Colors.black, 0.78)!;
+      return Expanded(
+        child: Container(
+          margin: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(look.radius * 0.5),
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Column(
+                children: [
+                  Text(
+                    temp == null ? '—' : '${temp.round()}°',
+                    style: TextStyle(
+                      color: ink,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (psi != null && psi > 0)
+                    Text(
+                      psi.toStringAsFixed(1),
+                      style: TextStyle(color: ink, fontSize: 14),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 2, 4, 4),
+              child: Text(
+                'Tyres °C, psi',
+                style: TextStyle(
+                  color: deckColors['amber'],
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Expanded(child: Row(children: [tyre('Fl'), tyre('Fr')])),
+            Expanded(child: Row(children: [tyre('Rl'), tyre('Rr')])),
+          ],
+        ),
+      ),
     );
   }
 }

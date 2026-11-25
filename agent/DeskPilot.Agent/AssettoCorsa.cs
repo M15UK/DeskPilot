@@ -5,8 +5,11 @@ using System.IO.MemoryMappedFiles;
 namespace DeskPilot.Agent;
 
 /// <summary>
-/// What a sim racing dashboard shows. Speed in km/h, fuel in litres, times in seconds, temperatures in °C.
-/// Gear is -1 for reverse, 0 for neutral, then 1, 2, 3... A lap time that doesn't exist yet is null.
+/// What a sim racing dashboard shows. Speed in km/h, fuel in litres, times in seconds, temperatures in °C, pressures
+/// in psi. Gear is -1 for reverse, 0 for neutral, then 1, 2, 3... A lap time that doesn't exist yet is null.
+/// <see cref="Delta"/> is seconds against the best lap (negative is faster). <see cref="PitLimiter"/> and
+/// <see cref="InPitLane"/> are 1 or 0, <see cref="Flag"/> is 0 none, 1 blue, 2 yellow, 3 black, 4 white, 5 chequered,
+/// 6 penalty. <see cref="Laps"/> is the race length, null in practice. The fuel numbers come from the laps driven.
 /// </summary>
 public sealed record SimTelemetry(
     double Speed,
@@ -23,13 +26,29 @@ public sealed record SimTelemetry(
     double TyreFlTemp,
     double TyreFrTemp,
     double TyreRlTemp,
-    double TyreRrTemp)
+    double TyreRrTemp,
+    double? Delta = null,
+    int PitLimiter = 0,
+    int InPitLane = 0,
+    int Flag = 0,
+    int? Laps = null,
+    int Sector = 1,
+    double? LastSector = null,
+    double TyreFlPressure = 0,
+    double TyreFrPressure = 0,
+    double TyreRlPressure = 0,
+    double TyreRrPressure = 0,
+    double? FuelPerLap = null,
+    double? LapsOfFuel = null,
+    double? FuelToFinish = null)
 {
     /// <summary>The names stat tiles use, the same as the JSON property names.</summary>
     public static readonly FrozenSet<string> Names = new[]
     {
         "speed", "rpm", "rpmMax", "gear", "fuel", "fuelMax", "lap", "position", "lapTime", "lastLap", "bestLap",
-        "tyreFlTemp", "tyreFrTemp", "tyreRlTemp", "tyreRrTemp",
+        "tyreFlTemp", "tyreFrTemp", "tyreRlTemp", "tyreRrTemp", "delta", "pitLimiter", "inPitLane", "flag", "laps",
+        "sector", "lastSector", "tyreFlPressure", "tyreFrPressure", "tyreRlPressure", "tyreRrPressure", "fuelPerLap",
+        "lapsOfFuel", "fuelToFinish",
     }.ToFrozenSet();
 }
 
@@ -39,8 +58,8 @@ public sealed record SimTelemetry(
 /// </summary>
 public static class AssettoCorsa
 {
-    public const int PhysicsBytes = 168;
-    public const int GraphicsBytes = 152;
+    public const int PhysicsBytes = 316;
+    public const int GraphicsBytes = 280;
     public const int StaticBytes = 420;
     const int Driving = 2;
     const int Paused = 3;
@@ -68,7 +87,19 @@ public static class AssettoCorsa
             TyreFlTemp: Math.Round(Float(physics, 152)),
             TyreFrTemp: Math.Round(Float(physics, 156)),
             TyreRlTemp: Math.Round(Float(physics, 160)),
-            TyreRrTemp: Math.Round(Float(physics, 164)));
+            TyreRrTemp: Math.Round(Float(physics, 164)),
+            // Meaningless until there is a best lap to compare with.
+            Delta: Seconds(Int(graphics, 148)) is null ? null : Math.Round(Float(physics, 312), 3),
+            PitLimiter: Int(physics, 248) == 0 ? 0 : 1,
+            InPitLane: Int(graphics, 276) == 0 ? 0 : 1,
+            Flag: Int(graphics, 268) is >= 0 and <= 6 and var flag ? flag : 0,
+            Laps: Int(graphics, 172) is > 0 and var laps ? laps : null,
+            Sector: Int(graphics, 164) + 1, // AC counts sectors from 0
+            LastSector: Seconds(Int(graphics, 168)),
+            TyreFlPressure: Math.Round(Float(physics, 88), 1),
+            TyreFrPressure: Math.Round(Float(physics, 92), 1),
+            TyreRlPressure: Math.Round(Float(physics, 96), 1),
+            TyreRrPressure: Math.Round(Float(physics, 100), 1));
     }
 
     static int Int(ReadOnlySpan<byte> page, int at) => BinaryPrimitives.ReadInt32LittleEndian(page[at..]);
@@ -91,6 +122,7 @@ public sealed class AssettoCorsaReader : IDisposable
     readonly Func<(byte[] Physics, byte[] Graphics, byte[] Static)?> snapshot;
     MemoryMappedFile[] files = [];
     int lastPacket = int.MinValue;
+    readonly FuelLog fuel = new();
     DateTimeOffset lastChange;
     DateTimeOffset nextTry;
 
@@ -124,7 +156,7 @@ public sealed class AssettoCorsaReader : IDisposable
             nextTry = now + RetryEvery;
             return null;
         }
-        return AssettoCorsa.Parse(physics, graphics, info);
+        return AssettoCorsa.Parse(physics, graphics, info) is { } car ? fuel.Add(car) : null;
     }
 
     public void Dispose() => Close();
@@ -174,5 +206,56 @@ public sealed class AssettoCorsaReader : IDisposable
         }
         files = [];
         lastPacket = int.MinValue;
+    }
+}
+
+/// <summary>
+/// Works out fuel per lap from the last few whole laps, and from that the laps of fuel left and how much to add to
+/// finish the race. A lap you joined halfway, or one with a refuel, doesn't count.
+/// </summary>
+sealed class FuelLog
+{
+    const int LapsKept = 5;
+    readonly Queue<double> perLap = new();
+    int lap = -1;
+    double fuelAtLapStart;
+    bool sawLapStart;
+
+    public SimTelemetry Add(SimTelemetry car)
+    {
+        if (car.Lap != lap)
+        {
+            if (car.Lap == lap + 1 && sawLapStart && fuelAtLapStart - car.Fuel is > 0 and var used
+                && used < car.FuelMax)
+            {
+                perLap.Enqueue(used);
+                if (perLap.Count > LapsKept)
+                {
+                    perLap.Dequeue();
+                }
+            }
+            else if (car.Lap < lap)
+            {
+                perLap.Clear(); // a new session
+            }
+            sawLapStart = lap >= 0;
+            lap = car.Lap;
+            fuelAtLapStart = car.Fuel;
+        }
+        if (perLap.Count == 0)
+        {
+            return car;
+        }
+        var average = perLap.Average();
+        // The current lap still needs driving, so it counts as one to go.
+        double? toFinish = car.Laps is { } laps
+            ? Math.Max(0, Math.Ceiling(((laps - car.Lap + 1) * average - car.Fuel) * 10) / 10)
+            : null;
+        return car with
+        {
+            FuelPerLap = Math.Round(average, 2),
+            LapsOfFuel = Math.Round(car.Fuel / average, 1),
+            FuelToFinish = toFinish,
+        };
     }
 }

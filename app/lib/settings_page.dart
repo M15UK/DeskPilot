@@ -15,6 +15,7 @@ class SettingsPage extends StatefulWidget {
     this.onLoadBackup,
     this.canVibrate = true,
     this.onAddHomeWidgets,
+    this.onAddRacingPage,
   });
 
   final AppSettings settings;
@@ -35,6 +36,9 @@ class SettingsPage extends StatefulWidget {
 
   /// Puts music and clock tiles on the first page; null without a deck.
   final VoidCallback? onAddHomeWidgets;
+
+  /// Adds a ready made Racing page; null without a deck.
+  final VoidCallback? onAddRacingPage;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -175,6 +179,21 @@ class _SettingsPageState extends State<SettingsPage> {
               onPressed: add,
               icon: const Icon(Icons.dashboard_customize_rounded),
               label: const Text('Add music and clock to the first page'),
+            ),
+          ],
+          if (widget.onAddRacingPage case final add?) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: add,
+              icon: const Icon(Icons.sports_motorsports_rounded),
+              label: const Text('Add a Racing page'),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Gear, speed, delta, tyres, fuel, lap times, flag and pit '
+              'limiter from Assetto Corsa, plus ABS, traction control and '
+              'camera keys. Move, resize or change any of it in edit mode.',
+              style: TextStyle(color: look.muted, fontSize: 12),
             ),
           ],
           _Section('Backup and share'),

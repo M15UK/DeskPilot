@@ -18,7 +18,7 @@ public static class Actions
                 // The system picks the program, as a double click would: apps, files, folders and links all work.
                 Process.Start(new ProcessStartInfo(open.Target) { UseShellExecute = true })?.Dispose();
                 return Task.CompletedTask;
-            case StatAction or FolderAction or MusicAction or ClockAction or PhotosAction:
+            case StatAction or FolderAction or MusicAction or ClockAction or PhotosAction or TyresAction:
                 return Task.CompletedTask; // These show things or open on the phone; the PC has nothing to run.
             default:
                 throw new ArgumentOutOfRangeException(nameof(action), action, "Unknown button action");

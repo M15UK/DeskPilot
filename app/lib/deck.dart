@@ -34,6 +34,20 @@ const statNames = {
   'tyreFrTemp': 'Sim: front right tyre',
   'tyreRlTemp': 'Sim: rear left tyre',
   'tyreRrTemp': 'Sim: rear right tyre',
+  'delta': 'Sim: delta to best lap',
+  'pitLimiter': 'Sim: pit limiter',
+  'inPitLane': 'Sim: in the pit lane',
+  'flag': 'Sim: flag',
+  'laps': 'Sim: race laps',
+  'sector': 'Sim: sector',
+  'lastSector': 'Sim: last sector',
+  'tyreFlPressure': 'Sim: front left pressure',
+  'tyreFrPressure': 'Sim: front right pressure',
+  'tyreRlPressure': 'Sim: rear left pressure',
+  'tyreRrPressure': 'Sim: rear right pressure',
+  'fuelPerLap': 'Sim: fuel per lap',
+  'lapsOfFuel': 'Sim: laps of fuel left',
+  'fuelToFinish': 'Sim: fuel to add to finish',
 };
 
 /// How a stat tile shows its reading.
@@ -60,6 +74,7 @@ sealed class ButtonAction {
       StatAction(stat, style),
     {'kind': 'music'} => const MusicAction(),
     {'kind': 'clock'} => const ClockAction(),
+    {'kind': 'tyres'} => const TyresAction(),
     {'kind': 'photos', 'pictures': final List<Object?> pictures}
         when pictures.every((id) => id is String) =>
       PhotosAction(List.unmodifiable(pictures.cast<String>())),
@@ -120,6 +135,15 @@ final class ClockAction extends ButtonAction {
 
   @override
   Map<String, Object> toJson() => {'kind': 'clock'};
+}
+
+/// A tile with the sim car's four tyres, colored by temperature, with their
+/// pressures.
+final class TyresAction extends ButtonAction {
+  const TyresAction();
+
+  @override
+  Map<String, Object> toJson() => {'kind': 'tyres'};
 }
 
 /// A tile that shows [pictures] in turn, like a photo frame.
@@ -535,6 +559,53 @@ class Deck {
     ],
   );
 
+  /// Adds a Racing page laid out for a tablet: gear, speed, revs, delta and
+  /// position on top, then tyres, fuel and lap times, then the flag, pit
+  /// limiter and race keys. Its keys use Assetto Corsa's known defaults (ABS
+  /// Ctrl+A, traction control Ctrl+T, cameras F1); change them in edit mode.
+  Deck withRacingPage() {
+    DeckButton tile(
+      String label,
+      ButtonAction action,
+      int x,
+      int y, [
+      int w = 1,
+      int h = 1,
+    ]) => DeckButton(
+      id: newButtonId(),
+      label: label,
+      action: action,
+      left: x * eighths,
+      top: y * eighths,
+      width: w == 1 ? null : w * eighths,
+      height: h == 1 ? null : h * eighths,
+    );
+    final racing = DeckPage(
+      name: 'Racing',
+      icon: 'sports_motorsports',
+      buttons: List.unmodifiable([
+        tile('Gear', const StatAction('gear', 'number'), 0, 0),
+        tile('Speed', const StatAction('speed', 'number'), 1, 0),
+        tile('RPM', const StatAction('rpm', 'gauge'), 2, 0),
+        tile('Delta', const StatAction('delta', 'number'), 3, 0, 2),
+        tile('Position', const StatAction('position', 'number'), 5, 0),
+        tile('Tyres', const TyresAction(), 0, 1, 2, 2),
+        tile('Laps of fuel', const StatAction('lapsOfFuel', 'number'), 2, 1),
+        tile('Fuel to add', const StatAction('fuelToFinish', 'number'), 3, 1),
+        tile('Last lap', const StatAction('lastLap', 'number'), 4, 1),
+        tile('Best lap', const StatAction('bestLap', 'number'), 5, 1),
+        tile('Flag', const StatAction('flag', 'number'), 2, 2),
+        tile('Pit limiter', const StatAction('pitLimiter', 'number'), 3, 2),
+        tile('Lap', const StatAction('lap', 'number'), 4, 2),
+        tile('Sector', const StatAction('sector', 'number'), 5, 2),
+        tile('ABS', const KeysAction(['Ctrl+A']), 0, 3),
+        tile('Traction control', const KeysAction(['Ctrl+T']), 1, 3),
+        tile('Camera', const KeysAction(['F1']), 2, 3),
+      ]),
+    );
+    return Deck(List.unmodifiable([...pages, racing]));
+  }
+
   /// Puts a wide music tile and a clock at the start of the first page,
   /// unless the deck has them already.
   Deck withHomeWidgets() {
@@ -662,6 +733,7 @@ String autoLabel(ButtonAction action) {
     MusicAction() => 'Music',
     ClockAction() => 'Clock',
     PhotosAction() => 'Photos',
+    TyresAction() => 'Tyres',
     StatAction(:final stat) => _capitalized(
       (statNames[stat] ?? stat).replaceFirst('Sim: ', ''),
     ),

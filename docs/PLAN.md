@@ -136,9 +136,26 @@ downloads.
 | 14 | Smart lights (Hue, Elgato Key Light, Home Assistant) | Each one's local API |
 | 15 | Twitch (Elgato Twitch) | Markers, chat, ads after a Twitch sign in |
 
-Order: 1 to 10 come with the UI round and Phase 5, 11 to 15 after. Later, a plugin host (the Stream Deck
-SDK WebSocket protocol, our own code) can run free open source plugins people add themselves, never
-Marketplace DRM ones.
+Order: 1 to 10 come with the UI round and Phase 5, 11 to 15 after.
+
+## Plugins
+
+Asked for: community plugins like other platforms, the 10 most popular ready to use, and an Assetto Corsa
+plugin.
+
+- **One plugin format.** DeskPilot's own features become plugins that add actions and tiles to the editor
+  (for example "Assetto Corsa: pit limiter", "Discord: mute"). Each plugin has a name, an icon, its actions
+  and their settings.
+- **Ten pre-installed**, ready to drop on a page from the editor: Assetto Corsa (telemetry tiles, the
+  Racing page, race keys), Discord, Music, OBS Studio, Volume per app, Audio device, Macros, Launcher,
+  PC tools, PC stats. These are our own code: the most popular Stream Deck plugins are closed source, and
+  Marketplace plugins have used Elgato's DRM since January 2026, so they can't be shipped or run.
+- **Community plugins.** The PC agent hosts plugins written for the Stream Deck SDK and its open
+  OpenAction version (the WebSocket protocol, our own MIT code, not OpenDeck's GPL code). People add a free
+  plugin's `.sdPlugin` folder or `.streamDeckPlugin` file; its keys and pictures show on the phone, and its
+  settings page opens in the editor. Plugins run as the user on the PC, so DeskPilot asks before installing
+  one and lists what it can do.
+- **A plugin gallery** in the app: installed plugins, the ten built in, and a list of known free plugins.
 
 ## Testing
 

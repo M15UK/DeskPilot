@@ -421,6 +421,10 @@ class _DeckPageState extends State<DeckPage> {
           final deck? => () => _save(deck.withHomeWidgets()),
           null => null,
         },
+        onAddRacingPage: switch (_deck) {
+          final deck? => () => _save(deck.withRacingPage()),
+          null => null,
+        },
       ),
     ),
   );

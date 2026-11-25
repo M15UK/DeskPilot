@@ -15,6 +15,7 @@ namespace DeskPilot.Agent;
 [JsonDerivedType(typeof(MusicAction), "music")]
 [JsonDerivedType(typeof(ClockAction), "clock")]
 [JsonDerivedType(typeof(PhotosAction), "photos")]
+[JsonDerivedType(typeof(TyresAction), "tyres")]
 public abstract record ButtonAction;
 
 /// <summary>A media key: playPause, next, previous, volumeUp, volumeDown or mute.</summary>
@@ -51,6 +52,9 @@ public sealed record MusicAction : ButtonAction;
 
 /// <summary>A tile with the time, which PC this is, and its CPU temperature and FPS.</summary>
 public sealed record ClockAction : ButtonAction;
+
+/// <summary>A tile with the four tyres of the sim car, colored by temperature, with their pressures.</summary>
+public sealed record TyresAction : ButtonAction;
 
 /// <summary>A tile that shows pictures from the <see cref="ImageStore"/> in turn, like a photo frame.</summary>
 public sealed record PhotosAction(IReadOnlyList<string> Pictures) : ButtonAction
@@ -293,7 +297,7 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
         OpenAction open => !string.IsNullOrWhiteSpace(open.Target) && open.Target.Length <= MaxTargetLength,
         StatAction stat => (PcStats.Names.Contains(stat.Stat) || SimTelemetry.Names.Contains(stat.Stat))
             && StatAction.Styles.Contains(stat.Style),
-        MusicAction or ClockAction => true,
+        MusicAction or ClockAction or TyresAction => true,
         PhotosAction photos => photos.Pictures.Count <= PhotosAction.MaxPictures
             && photos.Pictures.All(ImageStore.IsId),
         _ => false,

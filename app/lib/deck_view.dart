@@ -140,11 +140,7 @@ class DeckView extends StatelessWidget {
   Widget _grid(BuildContext context) {
     final shown = deck.pages[page];
     final open = _openFolder;
-    final buttons = switch (open?.action) {
-      FolderAction(:final buttons) => buttons,
-      _ => shown.buttons,
-    };
-    final adding = editing && buttons.length < _maxButtonsPerPage;
+    final buttons = _shownButtons;
     final grid = TileGrid(
       cell: _cellSizes[shown.size] ?? _cellSizes[null]!,
       gap: DeckLook.of(context).gap,
@@ -164,9 +160,8 @@ class DeckView extends StatelessWidget {
             x: button.fine.left,
             y: button.fine.top,
           ),
-        if (adding) (w: eighths, h: eighths, x: null, y: null),
       ],
-      // The Back and Add button tiles stay where the grid puts them.
+      // The Back tile stays where the grid puts it.
       movable: {
         for (var i = 0; i < buttons.length; i++) i + (open == null ? 0 : 1),
       },
@@ -193,24 +188,6 @@ class DeckView extends StatelessWidget {
             onTap: () => onFolderChanged?.call(null),
           ),
         for (final button in buttons) _placed(context, button),
-        if (adding)
-          OutlinedButton.icon(
-            onPressed: () => _editButton(context, null),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: DeckLook.of(context).muted,
-              side: BorderSide(
-                color: DeckLook.of(context).cardBorder,
-                width: 1.5,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(
-                  DeckLook.of(context).radius,
-                ),
-              ),
-            ),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Add button'),
-          ),
       ],
     );
     if (pictures[shown.wallpaper] case final wallpaper?) {
@@ -274,6 +251,7 @@ class DeckView extends StatelessWidget {
         onKey: editing ? null : onMediaKey,
       ),
       ClockAction() => ClockTile(pcName: pcName, stats: stats),
+      TyresAction() => TyresTile(stats: stats),
       PhotosAction(pictures: final ids) => PhotosTile(
         pictures: [for (final id in ids) ?pictures[id]],
       ),
@@ -323,7 +301,23 @@ class DeckView extends StatelessWidget {
     );
   }
 
+  /// The buttons on show: the open folder's, or the page's.
+  List<DeckButton> get _shownButtons => switch (_openFolder?.action) {
+    FolderAction(:final buttons) => buttons,
+    _ => deck.pages[page].buttons,
+  };
+
+  /// In the rail or the chips rather than the grid, so it never takes a spot
+  /// a tile could move to.
+  bool get _canAdd => _shownButtons.length < _maxButtonsPerPage;
+
   List<_RailItem> _pageActions(BuildContext context) => [
+    if (_canAdd)
+      _RailItem(
+        icon: Icons.add_box_rounded,
+        label: 'Add button',
+        onTap: () => _editButton(context, null),
+      ),
     _RailItem(
       icon: Icons.edit_rounded,
       label: 'Page settings',
@@ -351,6 +345,12 @@ class DeckView extends StatelessWidget {
               onSelected: (_) => onPageChanged(index),
             ),
           if (editing) ...[
+            if (_canAdd)
+              ActionChip(
+                avatar: const Icon(Icons.add_box_rounded),
+                label: const Text('Add button'),
+                onPressed: () => _editButton(context, null),
+              ),
             ActionChip(
               avatar: const Icon(Icons.edit_rounded),
               label: const Text('Page settings'),

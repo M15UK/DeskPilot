@@ -96,12 +96,16 @@ class _ButtonEditorState extends State<ButtonEditor> {
     OpenAction() => 'open',
     StatAction() => 'stat',
     FolderAction() => 'folder',
-    MusicAction() || ClockAction() || PhotosAction() => 'widget',
+    MusicAction() ||
+    ClockAction() ||
+    PhotosAction() ||
+    TyresAction() => 'widget',
     _ => 'media',
   };
   late String _widget = switch (widget.button?.action) {
     ClockAction() => 'clock',
     PhotosAction() => 'photos',
+    TyresAction() => 'tyres',
     _ => 'music',
   };
   late List<String> _photos = switch (widget.button?.action) {
@@ -198,6 +202,7 @@ class _ButtonEditorState extends State<ButtonEditor> {
     }),
     'widget' => switch (_widget) {
       'clock' => const ClockAction(),
+      'tyres' => const TyresAction(),
       'photos' => PhotosAction(List.unmodifiable(_photos)),
       _ => const MusicAction(),
     },
@@ -331,6 +336,7 @@ class _ButtonEditorState extends State<ButtonEditor> {
         child: switch (button.action) {
           MusicAction() => const NowPlayingCard(media: null, onKey: null),
           ClockAction() => const ClockTile(pcName: null, stats: {}),
+          TyresAction() => const TyresTile(stats: {}),
           PhotosAction() => PhotosTile(pictures: _photoPictures),
           final StatAction stat => StatTile(
             label: button.label,
@@ -448,6 +454,7 @@ class _ButtonEditorState extends State<ButtonEditor> {
                         'music': 'Music',
                         'clock': 'Clock',
                         'photos': 'Photos',
+                        'tyres': 'Tyres',
                       },
                       selected: _widget,
                       onSelect: (picked) => setState(() {

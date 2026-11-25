@@ -169,7 +169,10 @@ Color statColor(String stat) => switch (stat) {
   'gpuLoad' => deckColors['teal']!,
   'ramLoad' => deckColors['purple']!,
   'fps' => deckColors['green']!,
-  'lapTime' || 'lastLap' || 'bestLap' => deckColors['purple']!,
+  'lapTime' || 'lastLap' || 'bestLap' || 'lastSector' => deckColors['purple']!,
+  'delta' || 'pitLimiter' || 'lapsOfFuel' => deckColors['green']!,
+  'flag' || 'fuelToFinish' => deckColors['amber']!,
+  _ when stat.endsWith('Pressure') => deckColors['teal']!,
   _ when stat.endsWith('Temp') => deckColors['amber']!,
   _ => deckColors['red']!,
 };
@@ -186,6 +189,7 @@ IconData _autoIcon(ButtonAction action) => switch (action) {
   FolderAction() => Icons.folder_rounded,
   MusicAction() => Icons.music_note_rounded,
   ClockAction() => Icons.schedule_rounded,
+  TyresAction() => Icons.tire_repair_rounded,
   PhotosAction() => Icons.photo_library_rounded,
   OpenAction(:final target) when target.contains('://') =>
     Icons.language_rounded,
@@ -205,6 +209,7 @@ Color _autoColor(ButtonAction action) => switch (action) {
   FolderAction() => deckColors['amber']!,
   MusicAction() => deckColors['pink']!,
   ClockAction() => deckColors['blue']!,
+  TyresAction() => deckColors['amber']!,
   PhotosAction() => deckColors['purple']!,
   OpenAction() => deckColors['purple']!,
   StatAction(:final stat) => statColor(stat),

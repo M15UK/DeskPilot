@@ -191,7 +191,8 @@ void main() {
         '{"pages":[{"name":"Home","buttons":['
         '{"id":"m","label":"Music","action":{"kind":"music"},"size":"wider"},'
         '{"id":"c","label":"Clock","action":{"kind":"clock"},"size":"huge"},'
-        '{"id":"p","label":"Photos","action":{"kind":"photos","pictures":["0123456789abcdef"]},"size":"big"}'
+        '{"id":"p","label":"Photos","action":{"kind":"photos","pictures":["0123456789abcdef"]},"size":"big"},'
+        '{"id":"t","label":"Tyres","action":{"kind":"tyres"}}'
         ']}]}';
 
     final deck = Deck.fromJson(jsonDecode(json))!;
@@ -274,6 +275,23 @@ void main() {
         ']}]}';
 
     expect(jsonEncode(Deck.fromJson(jsonDecode(json))!.toJson()), json);
+  });
+
+  test('adds a ready Racing page with the car info and race keys', () {
+    final deck = sample().withRacingPage();
+    final racing = deck.pages.last;
+
+    expect(racing.name, 'Racing');
+    final kinds = [for (final b in racing.buttons) b.action];
+    expect(kinds.whereType<TyresAction>(), hasLength(1));
+    expect(
+      kinds.whereType<StatAction>().map((s) => s.stat),
+      containsAll(['gear', 'delta', 'lapsOfFuel', 'flag', 'pitLimiter']),
+    );
+    // Every tile has its own place on a six cell wide tablet.
+    for (final b in racing.buttons) {
+      expect(b.fine.left! + b.fine.width, lessThanOrEqualTo(6 * eighths));
+    }
   });
 
   test('new button ids are unique', () {
