@@ -170,10 +170,12 @@ class DeckButton {
     'image': ?image,
   };
 
-  DeckButton _withAction(ButtonAction action) => DeckButton(
-    id: id,
+  DeckButton _withAction(ButtonAction action) => _copy(action: action);
+
+  DeckButton _copy({String? id, ButtonAction? action}) => DeckButton(
+    id: id ?? this.id,
     label: label,
-    action: action,
+    action: action ?? this.action,
     icon: icon,
     color: color,
     size: size,
@@ -397,6 +399,26 @@ class Deck {
       wallpaper: wallpaper,
     ),
   );
+
+  /// Adds a page from a backup at the end, with new button ids, so they can't
+  /// clash with this deck's.
+  Deck withImportedPage(DeckPage page) {
+    DeckButton fresh(DeckButton button) => button._copy(
+      id: newButtonId(),
+      action: switch (button.action) {
+        FolderAction(:final buttons) => FolderAction(
+          List.unmodifiable(buttons.map(fresh)),
+        ),
+        final other => other,
+      },
+    );
+    return Deck(
+      List.unmodifiable([
+        ...pages,
+        page._withButtons([for (final button in page.buttons) fresh(button)]),
+      ]),
+    );
+  }
 
   /// Every picture the deck uses, on buttons, in folders and behind pages.
   Set<String> get pictureIds => {

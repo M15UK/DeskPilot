@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:deskpilot/agent_connection.dart';
+import 'package:deskpilot/backup.dart';
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/deck_view.dart';
 import 'package:deskpilot/look.dart';
@@ -230,6 +231,103 @@ class _DeckPageState extends State<DeckPage> {
     return id;
   }
 
+  Future<void> _backupDeck() async {
+    final deck = _deck;
+    if (deck == null) return;
+    await _share(
+      writeBackup(deck: deck, pictures: _pictures),
+      'deskpilot-deck.json',
+    );
+  }
+
+  Future<void> _sharePage(int page) async {
+    final deck = _deck;
+    if (deck == null || page >= deck.pages.length) return;
+    final shown = deck.pages[page];
+    final name = shown.name
+        .toLowerCase()
+        .replaceAll(RegExp('[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    await _share(
+      writeBackup(page: shown, pictures: _pictures),
+      'deskpilot-${name.isEmpty ? 'page' : name}.json',
+    );
+  }
+
+  Future<void> _share(String text, String fileName) async {
+    try {
+      await shareBackup(text, fileName);
+    } on PlatformException {
+      _tell("Couldn't open sharing on this tablet.");
+    }
+  }
+
+  /// Loads a backup file: a whole deck replaces the PC's (after asking), and
+  /// a page is added to it. Its pictures go to the PC first.
+  Future<void> _loadBackup() async {
+    final String? text;
+    try {
+      text = await pickBackup();
+    } on PlatformException {
+      _tell("Couldn't open your files on this tablet.");
+      return;
+    }
+    final agent = _agent;
+    final deck = _deck;
+    if (text == null || !mounted) return;
+    if (agent == null || deck == null) {
+      _tell('Connect to the PC to load a backup.');
+      return;
+    }
+    final backup = readBackup(text);
+    final next = switch (backup) {
+      Backup(deck: final whole?) => whole,
+      Backup(page: final page?) => deck.withImportedPage(page),
+      _ => null,
+    };
+    if (backup == null || next == null) {
+      _tell("That file isn't a DeskPilot backup.");
+      return;
+    }
+    if (backup.deck != null && !await _sureToReplace()) return;
+    backup.pictures.forEach(agent.saveImage);
+    setState(() => _pictures = {..._pictures, ...backup.pictures});
+    agent.saveDeck(next);
+    _tell(switch (backup.page) {
+      final page? => 'Added the page "${page.name}".',
+      null => 'Loaded the backup.',
+    });
+  }
+
+  Future<bool> _sureToReplace() async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Replace your deck?'),
+          content: const Text(
+            "The backup's pages and buttons will replace the ones on the PC. "
+            'Back up your current deck first if you might want it again.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Replace'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  /// A short message at the bottom of whatever screen is open.
+  void _tell(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
   void _save(Deck deck) {
     final agent = _agent;
     if (agent == null) {
@@ -310,6 +408,8 @@ class _DeckPageState extends State<DeckPage> {
         onChanged: (settings) => widget.onSettings?.call(settings),
         pcName: _saved?.pc.name,
         onForget: () => unawaited(_forget()),
+        onBackup: _deck == null ? null : () => unawaited(_backupDeck()),
+        onLoadBackup: _agent == null ? null : () => unawaited(_loadBackup()),
       ),
     ),
   );
@@ -417,6 +517,7 @@ class _DeckPageState extends State<DeckPage> {
                   folder: _folder,
                   pictures: _pictures,
                   onPicture: agent == null ? null : _savePicture,
+                  onSharePage: (page) => unawaited(_sharePage(page)),
                   onFolderChanged: (id) => setState(() => _folder = id),
                   stats: {..._stats, ..._telemetry},
                   history: _history,

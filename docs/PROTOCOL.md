@@ -55,6 +55,12 @@ Messages can be up to 1 MB. A bigger one closes the connection with close code 1
 | `{"type":"image","id":"0123456789abcdef","data":"<base64>"}` | The answer to `getImage`. Without `data`, the PC doesn't have that picture. |
 | `{"type":"error","message":"..."}` | Something could not be done, for example a deck that breaks a rule below, or `"Key buttons work on Windows for now."`. Anything else gets `"Unknown message"`. |
 
+## Backup files
+
+The phone's backup and share files are JSON: `{"deskpilot":"backup","version":1,"deck":{...},"pictures":{"<id>":"<base64>"}}`
+for a whole deck, or `"page":{...}` instead of `"deck"` for one shared page. They never reach the PC as files:
+the phone sends the pictures with `saveImage` and the result with `saveDeck`.
+
 ## Deck
 
 ```json

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   late AppSettings saved;
+  var backedUp = false;
 
   Widget host() => MaterialApp(
     home: SettingsPage(
@@ -12,8 +13,20 @@ void main() {
       onChanged: (settings) => saved = settings,
       pcName: 'GAMING-PC',
       onForget: () {},
+      onBackup: () => backedUp = true,
+      onLoadBackup: () {},
     ),
   );
+
+  testWidgets('backs up the deck', (tester) async {
+    await tester.pumpWidget(host());
+
+    await tester.scrollUntilVisible(find.text('Back up the deck'), 200);
+    await tester.tap(find.text('Back up the deck'));
+
+    expect(backedUp, isTrue);
+    expect(find.text('Load a backup'), findsOneWidget);
+  });
 
   testWidgets('picks a theme', (tester) async {
     await tester.pumpWidget(host());

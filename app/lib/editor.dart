@@ -467,11 +467,15 @@ class PageEditor extends StatefulWidget {
     this.pictures = const {},
     this.pickPicture,
     this.onPicture,
+    this.onShare,
   });
 
   final String title;
   final DeckPage? page;
   final bool canDelete;
+
+  /// Shares this page as a file; null for a new page.
+  final VoidCallback? onShare;
   final Map<String, Uint8List> pictures;
   final PickPicture? pickPicture;
   final String Function(Uint8List)? onPicture;
@@ -589,6 +593,14 @@ class _PageEditorState extends State<PageEditor> {
       ),
     ),
     actions: [
+      if (widget.onShare case final share?)
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            share();
+          },
+          child: const Text('Share this page'),
+        ),
       if (widget.canDelete)
         TextButton(
           onPressed: () => Navigator.of(context).pop(const DeletePage()),

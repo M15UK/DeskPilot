@@ -11,6 +11,8 @@ class SettingsPage extends StatefulWidget {
     required this.onChanged,
     required this.pcName,
     required this.onForget,
+    this.onBackup,
+    this.onLoadBackup,
   });
 
   final AppSettings settings;
@@ -19,6 +21,12 @@ class SettingsPage extends StatefulWidget {
   /// Null when no PC is paired.
   final String? pcName;
   final VoidCallback onForget;
+
+  /// Shares the whole deck as a file; null while there's no deck.
+  final VoidCallback? onBackup;
+
+  /// Loads a backup file; null while the PC isn't connected.
+  final VoidCallback? onLoadBackup;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -166,7 +174,36 @@ class _SettingsPageState extends State<SettingsPage> {
             value: s.cardsOnEveryPage,
             onChanged: (on) => _change(s.copyWith(cardsOnEveryPage: on)),
           ),
+          _Section('Backup and share'),
+          if (widget.onBackup == null && widget.onLoadBackup == null)
+            const Text('Connect to your PC to back up or load a deck.')
+          else
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                if (widget.onBackup case final backup?)
+                  OutlinedButton.icon(
+                    onPressed: backup,
+                    icon: const Icon(Icons.ios_share_rounded),
+                    label: const Text('Back up the deck'),
+                  ),
+                if (widget.onLoadBackup case final load?)
+                  OutlinedButton.icon(
+                    onPressed: load,
+                    icon: const Icon(Icons.file_open_rounded),
+                    label: const Text('Load a backup'),
+                  ),
+              ],
+            ),
           const SizedBox(height: 8),
+          Text(
+            'A backup holds your pages, buttons and pictures. Save it to your '
+            'files or send it to a friend. To share one page, use Page '
+            'settings.',
+            style: TextStyle(color: look.muted, fontSize: 12),
+          ),
+          const SizedBox(height: 24),
           Text(
             'These settings are for this tablet only. Your buttons and pages '
             'are kept on the PC.',

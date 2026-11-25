@@ -390,6 +390,32 @@ void main() {
     expect(changed!.pages[0].buttons.single.image, uploaded);
   });
 
+  testWidgets('page settings share the page', (tester) async {
+    int? shared;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DeckView(
+            deck: deck,
+            page: 0,
+            editing: true,
+            onPress: null,
+            onChange: _ignore,
+            onPageChanged: _ignore,
+            onSharePage: (page) => shared = page,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Page settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Share this page'));
+    await tester.pumpAndSettle();
+
+    expect(shared, 0);
+  });
+
   testWidgets('adds a page in edit mode', (tester) async {
     await tester.pumpWidget(host(editing: true));
 

@@ -46,6 +46,7 @@ class DeckView extends StatelessWidget {
     this.pictures = const {},
     this.pickPicture,
     this.onPicture,
+    this.onSharePage,
   });
 
   final Deck deck;
@@ -82,6 +83,9 @@ class DeckView extends StatelessWidget {
 
   /// Sends a picked photo to the PC and returns its id; null hides pictures.
   final String Function(Uint8List)? onPicture;
+
+  /// Shares page [int] as a backup file.
+  final ValueChanged<int>? onSharePage;
 
   /// The open folder's button, when [folder] is still a folder on this page.
   DeckButton? get _openFolder {
@@ -421,6 +425,10 @@ class DeckView extends StatelessWidget {
         title: 'Page settings',
         page: deck.pages[page],
         canDelete: deck.pages.length > 1,
+        onShare: switch (onSharePage) {
+          final share? => () => share(page),
+          null => null,
+        },
         pictures: pictures,
         pickPicture: pickPicture,
         onPicture: onPicture,
