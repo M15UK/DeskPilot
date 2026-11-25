@@ -10,6 +10,8 @@
 	<string>DeskPilot</string>
 	<key>NSCameraUsageDescription</key>
 	<string>DeskPilot uses the camera to scan the QR code on your PC, so the two can pair.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>DeskPilot uses a photo you pick as a button picture or page wallpaper.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

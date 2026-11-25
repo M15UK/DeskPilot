@@ -173,6 +173,17 @@ void main() {
       }),
     );
     expect(
+      readEvent('{"type":"image","id":"0123456789abcdef","data":"AQID"}'),
+      isA<PictureArrived>()
+          .having((e) => e.id, 'id', '0123456789abcdef')
+          .having((e) => e.bytes, 'bytes', [1, 2, 3]),
+    );
+    expect(
+      readEvent('{"type":"image","id":"0123456789abcdef"}'),
+      isA<PictureArrived>().having((e) => e.bytes, 'bytes', isNull),
+      reason: 'the PC no longer has it',
+    );
+    expect(
       readEvent('not json'),
       isA<PcSays>().having(
         (e) => e.text,

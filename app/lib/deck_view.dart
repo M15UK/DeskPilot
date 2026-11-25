@@ -1,8 +1,10 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/editor.dart';
 import 'package:deskpilot/look.dart';
+import 'package:deskpilot/pictures.dart';
 import 'package:deskpilot/tile_grid.dart';
 import 'package:deskpilot/tiles.dart';
 import 'package:flutter/material.dart';
@@ -41,6 +43,9 @@ class DeckView extends StatelessWidget {
     this.tools = const [],
     this.folder,
     this.onFolderChanged,
+    this.pictures = const {},
+    this.pickPicture,
+    this.onPicture,
   });
 
   final Deck deck;
@@ -68,6 +73,15 @@ class DeckView extends StatelessWidget {
   /// The id of the open folder on this page, or null for the page itself.
   final String? folder;
   final ValueChanged<String?>? onFolderChanged;
+
+  /// Pictures the phone has, by id, for buttons and wallpapers.
+  final Map<String, Uint8List> pictures;
+
+  /// Picks a photo in the editors; the phone's gallery when null.
+  final PickPicture? pickPicture;
+
+  /// Sends a picked photo to the PC and returns its id; null hides pictures.
+  final String Function(Uint8List)? onPicture;
 
   /// The open folder's button, when [folder] is still a folder on this page.
   DeckButton? get _openFolder {
@@ -177,6 +191,23 @@ class DeckView extends StatelessWidget {
           ),
       ],
     );
+    if (pictures[shown.wallpaper] case final wallpaper?) {
+      // Darkened, so the buttons stay easy to read on any photo.
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(DeckLook.of(context).radius),
+          image: DecorationImage(
+            image: MemoryImage(wallpaper),
+            fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(
+              Colors.black.withValues(alpha: 0.45),
+              BlendMode.darken,
+            ),
+          ),
+        ),
+        child: grid,
+      );
+    }
     final background = deckColors[shown.background];
     if (background == null) return grid;
     return DecoratedBox(
@@ -268,6 +299,7 @@ class DeckView extends StatelessWidget {
       color: buttonColor(button),
       style: button.style,
       show: button.show,
+      picture: pictures[button.image],
       onTap:
           edit ??
           (opens
@@ -326,7 +358,13 @@ class DeckView extends StatelessWidget {
     final open = _openFolder;
     final edit = await showDialog<ButtonEdit>(
       context: context,
-      builder: (_) => ButtonEditor(button: button, canBeFolder: open == null),
+      builder: (_) => ButtonEditor(
+        button: button,
+        canBeFolder: open == null,
+        pictures: pictures,
+        pickPicture: pickPicture,
+        onPicture: onPicture,
+      ),
     );
     switch (edit) {
       case SaveButton(button: final saved) when button == null && open != null:
@@ -347,13 +385,19 @@ class DeckView extends StatelessWidget {
   Future<void> _addPage(BuildContext context) async {
     final edit = await showDialog<PageEdit>(
       context: context,
-      builder: (_) => const PageEditor(title: 'Add page'),
+      builder: (_) => PageEditor(
+        title: 'Add page',
+        pictures: pictures,
+        pickPicture: pickPicture,
+        onPicture: onPicture,
+      ),
     );
     if (edit case SavePage(
       :final name,
       :final size,
       :final icon,
       :final background,
+      :final wallpaper,
     )) {
       final added = deck.withPage(name);
       onChange(
@@ -363,6 +407,7 @@ class DeckView extends StatelessWidget {
           size: size,
           icon: icon,
           background: background,
+          wallpaper: wallpaper,
         ),
       );
       onPageChanged(deck.pages.length);
@@ -376,10 +421,19 @@ class DeckView extends StatelessWidget {
         title: 'Page settings',
         page: deck.pages[page],
         canDelete: deck.pages.length > 1,
+        pictures: pictures,
+        pickPicture: pickPicture,
+        onPicture: onPicture,
       ),
     );
     switch (edit) {
-      case SavePage(:final name, :final size, :final icon, :final background):
+      case SavePage(
+        :final name,
+        :final size,
+        :final icon,
+        :final background,
+        :final wallpaper,
+      ):
         onChange(
           deck.changedPage(
             page,
@@ -387,6 +441,7 @@ class DeckView extends StatelessWidget {
             size: size,
             icon: icon,
             background: background,
+            wallpaper: wallpaper,
           ),
         );
       case DeletePage():

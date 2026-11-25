@@ -34,7 +34,8 @@ public sealed record StatAction(string Stat, string Style) : ButtonAction
 /// of <see cref="Colors"/>. Left out, the phone picks both from what the button does. <paramref name="Size"/> is one
 /// of <see cref="Sizes"/>: two places wide, two tall, or both. Left out, the button takes one place.
 /// <paramref name="Style"/> is one of <see cref="Styles"/> (left out: tinted), and <paramref name="Show"/> one of
-/// <see cref="Shows"/> (left out: icon and label).
+/// <see cref="Shows"/> (left out: icon and label). <paramref name="Image"/> is the id of a picture in the
+/// <see cref="ImageStore"/>, shown instead of the icon.
 /// </summary>
 /// <summary>A button that opens more buttons on the phone, with a way back. Folders don't hold folders.</summary>
 public sealed record FolderAction(IReadOnlyList<DeckButton> Buttons) : ButtonAction;
@@ -47,7 +48,8 @@ public sealed record DeckButton(
     string? Color = null,
     string? Size = null,
     string? Style = null,
-    string? Show = null)
+    string? Show = null,
+    string? Image = null)
 {
     public static readonly FrozenSet<string> Styles = new[] { "solid", "outline" }.ToFrozenSet();
 
@@ -62,14 +64,15 @@ public sealed record DeckButton(
 /// <summary>
 /// A page of buttons. <paramref name="Size"/> is one of <see cref="Sizes"/> (left out: medium). <paramref name="Icon"/>
 /// is the page's icon in the phone's page rail, and <paramref name="Background"/> one of
-/// <see cref="DeckButton.Colors"/>.
+/// <see cref="DeckButton.Colors"/>. <paramref name="Wallpaper"/> is the id of a picture behind the buttons.
 /// </summary>
 public sealed record DeckPage(
     string Name,
     IReadOnlyList<DeckButton> Buttons,
     string? Size = null,
     string? Icon = null,
-    string? Background = null)
+    string? Background = null,
+    string? Wallpaper = null)
 {
     public static readonly FrozenSet<string> Sizes = new[] { "small", "medium", "large", "huge" }.ToFrozenSet();
 }
@@ -161,7 +164,8 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
             }
             if (page.Size is not null && !DeckPage.Sizes.Contains(page.Size)
                 || page.Icon is not null && !IsIconName(page.Icon)
-                || page.Background is not null && !DeckButton.Colors.Contains(page.Background))
+                || page.Background is not null && !DeckButton.Colors.Contains(page.Background)
+                || page.Wallpaper is not null && !ImageStore.IsId(page.Wallpaper))
             {
                 return $"The page \"{page.Name}\" has a size, icon or background DeskPilot doesn't know.";
             }
@@ -194,7 +198,8 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
                 || button.Color is not null && !DeckButton.Colors.Contains(button.Color)
                 || button.Size is not null && !DeckButton.Sizes.Contains(button.Size)
                 || button.Style is not null && !DeckButton.Styles.Contains(button.Style)
-                || button.Show is not null && !DeckButton.Shows.Contains(button.Show))
+                || button.Show is not null && !DeckButton.Shows.Contains(button.Show)
+                || button.Image is not null && !ImageStore.IsId(button.Image))
             {
                 return $"The button \"{button.Label}\" has a look DeskPilot doesn't know.";
             }

@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/look.dart';
@@ -55,6 +56,7 @@ class KeyTile extends StatelessWidget {
     required this.color,
     this.style,
     this.show,
+    this.picture,
     this.onTap,
   });
 
@@ -63,6 +65,9 @@ class KeyTile extends StatelessWidget {
   final Color color;
   final String? style;
   final String? show;
+
+  /// The button's own picture, shown instead of the icon.
+  final Uint8List? picture;
   final VoidCallback? onTap;
 
   @override
@@ -99,48 +104,97 @@ class KeyTile extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             splashColor: color.withValues(alpha: 0.3),
-            child: LayoutBuilder(
-              builder: (context, size) {
-                // Bigger buttons get a bigger icon and name.
-                final side = min(size.maxWidth, size.maxHeight);
-                return Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    spacing: 8,
-                    children: [
-                      if (show != 'name')
-                        Icon(
-                          icon,
-                          size: (side * (show == 'icon' ? 0.42 : 0.24))
-                              .clamp(20, 120)
-                              .toDouble(),
-                          color: ink,
+            child: picture == null
+                ? LayoutBuilder(
+                    builder: (context, size) {
+                      // Bigger buttons get a bigger icon and name.
+                      final side = min(size.maxWidth, size.maxHeight);
+                      return Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          spacing: 8,
+                          children: [
+                            if (show != 'name')
+                              Icon(
+                                icon,
+                                size: (side * (show == 'icon' ? 0.42 : 0.24))
+                                    .clamp(20, 120)
+                                    .toDouble(),
+                                color: ink,
+                              ),
+                            if (show != 'icon')
+                              Text(
+                                label,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: text,
+                                  fontSize:
+                                      (side * (show == 'name' ? 0.14 : 0.08))
+                                          .clamp(12, 28)
+                                          .toDouble(),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                          ],
                         ),
-                      if (show != 'icon')
-                        Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: text,
-                            fontSize: (side * (show == 'name' ? 0.14 : 0.08))
-                                .clamp(12, 28)
-                                .toDouble(),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                      );
+                    },
+                  )
+                : _Pictured(picture: picture!, label: label, show: show),
           ),
         ),
       ),
     );
   }
+}
+
+/// A button's picture filling the tile, with its name on a dark strip.
+class _Pictured extends StatelessWidget {
+  const _Pictured({
+    required this.picture,
+    required this.label,
+    required this.show,
+  });
+
+  final Uint8List picture;
+  final String label;
+  final String? show;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: [
+      Image.memory(
+        picture,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+      ),
+      if (show != 'icon')
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            width: double.infinity,
+            color: Colors.black.withValues(alpha: 0.55),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
 }
 
 /// A PC or sim reading as a big number, a ring gauge or a chart of the last

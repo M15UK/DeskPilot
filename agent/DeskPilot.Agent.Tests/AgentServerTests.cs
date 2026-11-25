@@ -17,12 +17,18 @@ public sealed class HandleTests : IDisposable
     readonly DeckStore decks;
     readonly List<ButtonAction> ran = [];
 
-    public HandleTests() => decks = new DeckStore(Path.Combine(folder.Path, "deck.json"));
+    readonly ImageStore images;
+
+    public HandleTests()
+    {
+        decks = new DeckStore(Path.Combine(folder.Path, "deck.json"));
+        images = new ImageStore(Path.Combine(folder.Path, "images"));
+    }
 
     public void Dispose() => folder.Dispose();
 
     Task<string?> HandleAsync(string message, Func<ButtonAction, Task>? run = null) =>
-        AgentServer.HandleAsync(Encoding.UTF8.GetBytes(message), decks, run ?? (action =>
+        AgentServer.HandleAsync(Encoding.UTF8.GetBytes(message), decks, images, run ?? (action =>
         {
             ran.Add(action);
             return Task.CompletedTask;
@@ -45,6 +51,26 @@ public sealed class HandleTests : IDisposable
 
         Assert.Null(await HandleAsync("""{"type":"press","id":"pit"}"""));
         Assert.Equal(new KeysAction(["P"]), Assert.Single(ran), new ActionComparer());
+    }
+
+    [Fact]
+    public async Task APhoneKeepsAPictureOnThePcAndGetsItBack()
+    {
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 7];
+        var id = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(png))[..16];
+        var data = Convert.ToBase64String(png);
+
+        Assert.Null(await HandleAsync($$"""{"type":"saveImage","id":"{{id}}","data":"{{data}}"}"""));
+        Assert.Equal($$"""{"type":"image","id":"{{id}}","data":"{{data}}"}""",
+            await HandleAsync($$"""{"type":"getImage","id":"{{id}}"}"""));
+    }
+
+    [Fact]
+    public async Task AMissingOrBrokenPictureIsSaidPlainly()
+    {
+        Assert.Equal("""{"type":"image","id":"0123456789abcdef"}""",
+            await HandleAsync("""{"type":"getImage","id":"0123456789abcdef"}"""));
+        Assert.Contains("\"error\"", await HandleAsync("""{"type":"saveImage","id":"0123456789abcdef","data":"%%%"}"""));
     }
 
     [Fact]
@@ -129,7 +155,8 @@ public class ServerTests : IAsyncLifetime
         stats = new Feed<PcStats>(TimeSpan.FromSeconds(1), () => new PcStats(CpuLoad: 50, GpuLoad: null, GpuTemp: null, RamLoad: 40));
         telemetry = new Feed<SimTelemetry>(TimeSpan.FromMilliseconds(33), () => car);
         media = new Feed<NowPlaying>(TimeSpan.FromSeconds(1), () => song);
-        app = AgentServer.Create(port: 0, new AgentServices(security, decks, stats, telemetry, media, action =>
+        var images = new ImageStore(Path.Combine(folder.Path, "images"));
+        app = AgentServer.Create(port: 0, new AgentServices(security, decks, stats, telemetry, media, images, action =>
         {
             ran.Writer.TryWrite(action);
             return Task.CompletedTask;

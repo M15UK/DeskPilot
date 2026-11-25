@@ -42,6 +42,8 @@ Messages can be up to 1 MB. A bigger one closes the connection with close code 1
 | :-- | :-- |
 | `{"type":"press","id":"play-pause"}` | Runs the action of the deck button with that id. |
 | `{"type":"saveDeck","deck":{...}}` | Checks the deck, saves it in `deck.json` and sends it to every connected phone. |
+| `{"type":"saveImage","id":"0123456789abcdef","data":"<base64>"}` | Keeps a picture for a button or page in the PC's `images` folder. `id` is the first 16 hex characters of the picture's SHA-256 and must match it. JPEG, PNG, WebP or GIF, up to 700 KB. Nothing is sent back unless it fails. |
+| `{"type":"getImage","id":"0123456789abcdef"}` | Sends the picture back as an `image` message. |
 | `{"type":"mediaKey","media":"next"}` | Presses a media key, for the music card's buttons. `media` is one of the `media` action's keys below. |
 
 | PC to phone | When |
@@ -50,6 +52,7 @@ Messages can be up to 1 MB. A bigger one closes the connection with close code 1
 | `{"type":"stats","stats":{"cpuLoad":23.5,"gpuLoad":41,"gpuTemp":62.5,"ramLoad":48,"cpuTemp":61.3,"fps":144}}` | Every second. Loads are in percent, temperatures in °C, and `fps` is the frames per second of the app in front. A reading the PC can't give is left out: `cpuTemp` needs LibreHardwareMonitor, and `fps` needs the Windows user in the Performance Log Users group. |
 | `{"type":"telemetry","telemetry":{"speed":182,"rpm":7350,"rpmMax":8500,"gear":3,"fuel":41.5,"fuelMax":65,"lap":5,"position":2,"lapTime":31.25,"lastLap":103.9,"bestLap":102.345,"tyreFlTemp":85,...}}` | About 30 times a second while you drive or pause in Assetto Corsa, read from the shared memory the game publishes. Speed in km/h, fuel in litres, times in seconds, gear -1 for reverse and 0 for neutral. A lap time that doesn't exist yet is left out. If a phone is still sending the last one, the next is skipped. |
 | `{"type":"media","media":{"title":"Neon Highway","artist":"The Midnight Drive","app":"Spotify","playing":true,"position":35,"duration":240,"coverId":"9f2c...","cover":"<base64>"}}` | When what's playing changes, read from Windows' media session (Spotify, browsers, most players). Times in seconds, left out when the app doesn't give a length. `cover` is the album art (JPEG or PNG, up to 512 KB) and comes once per picture: later messages only carry its `coverId`. `{"type":"media"}` alone means nothing is playing. |
+| `{"type":"image","id":"0123456789abcdef","data":"<base64>"}` | The answer to `getImage`. Without `data`, the PC doesn't have that picture. |
 | `{"type":"error","message":"..."}` | Something could not be done, for example a deck that breaks a rule below, or `"Key buttons work on Windows for now."`. Anything else gets `"Unknown message"`. |
 
 ## Deck
@@ -75,6 +78,6 @@ characters. Button ids are unique across the deck, up to 64 characters. A button
 of up to 40 lowercase letters, digits and `_`, from the app's icon set) and a `color` (`red`, `amber`,
 `green`, `teal`, `blue`, `purple`, `pink` or `gray`). Without them the app picks both from what the button
 does. It may also have a `size` (`wide`, `tall` or `big`; left out it takes one place), a `style` (`solid`
-or `outline`; left out it is tinted) and a `show` (`icon` or `name`; left out it shows both). A page may
+or `outline`; left out it is tinted) a `show` (`icon` or `name`; left out it shows both), and an `image` (a picture id, shown instead of the icon). A page may
 have a `size` for its buttons (`small`, `medium`, `large` or `huge`), an `icon` for the page rail, and a
-`background` color.
+`background` color, and a `wallpaper` (a picture id) behind its buttons.

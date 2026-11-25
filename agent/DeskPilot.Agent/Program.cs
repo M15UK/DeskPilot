@@ -23,7 +23,8 @@ var telemetry = new Feed<SimTelemetry>(TimeSpan.FromMilliseconds(33), assettoCor
 var media = new Feed<NowPlaying>(TimeSpan.FromSeconds(1), new NowPlayingReader(TimeProvider.System).Read);
 
 var app = AgentServer.Create(AgentServer.DefaultPort,
-    new AgentServices(security, decks, stats, telemetry, media, Actions.RunAsync));
+    new AgentServices(security, decks, stats, telemetry, media, new ImageStore(Path.Combine(folder, "images")),
+        Actions.RunAsync));
 await app.StartAsync();
 _ = stats.RunAsync(app.Logger, app.Lifetime.ApplicationStopping);
 _ = telemetry.RunAsync(app.Logger, app.Lifetime.ApplicationStopping);

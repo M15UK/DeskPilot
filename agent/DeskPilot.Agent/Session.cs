@@ -126,7 +126,7 @@ sealed class Session(WebSocket socket, AgentServices services, ILogger logger, C
     {
         try
         {
-            return await AgentServer.HandleAsync(message, services.Decks, services.Run);
+            return await AgentServer.HandleAsync(message, services.Decks, services.Images, services.Run);
         }
         catch (Exception e)
         {

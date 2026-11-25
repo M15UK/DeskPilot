@@ -51,18 +51,20 @@ public class DeckTests
             """{"pages":[{"name":"Main","buttons":[""" +
             """{"id":"previous","label":"Previous","action":{"kind":"media","media":"previous"}},""" +
             """{"id":"play-pause","label":"Play / Pause","action":{"kind":"media","media":"playPause"}},""" +
-            """{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]},"icon":"flag","color":"amber","show":"icon"},""" +
+            """{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]},"icon":"flag","color":"amber","show":"icon","image":"0123456789abcdef"},""" +
             """{"id":"ac","label":"Assetto Corsa","action":{"kind":"open","target":"steam://rungameid/244210"}},""" +
             """{"id":"cpu","label":"CPU","action":{"kind":"stat","stat":"cpuLoad","style":"gauge"},"size":"wide","style":"outline"}""" +
-            """],"size":"large","icon":"home","background":"blue"}]}""";
+            """],"size":"large","icon":"home","background":"blue","wallpaper":"fedcba9876543210"}]}""";
         var deck = new Deck([new DeckPage("Main",
         [
             new DeckButton("previous", "Previous", new MediaAction("previous")),
             new DeckButton("play-pause", "Play / Pause", new MediaAction("playPause")),
-            new DeckButton("pit", "Pit", new KeysAction(["Ctrl+P", "Enter"]), Icon: "flag", Color: "amber", Show: "icon"),
+            new DeckButton("pit", "Pit", new KeysAction(["Ctrl+P", "Enter"]), Icon: "flag", Color: "amber", Show: "icon",
+                Image: "0123456789abcdef"),
             new DeckButton("ac", "Assetto Corsa", new OpenAction("steam://rungameid/244210")),
             new DeckButton("cpu", "CPU", new StatAction("cpuLoad", "gauge"), Size: "wide", Style: "outline"),
-        ], Size: "large", Icon: "home", Background: "blue")]);
+        ], Size: "large", Icon: "home", Background: "blue",
+            Wallpaper: "fedcba9876543210")]);
 
         Assert.Equal(expected, Json(deck));
     }
@@ -100,6 +102,8 @@ public class DeckTests
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},"show":"nothing"}]}]}""")]
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"f","label":"Streaming","action":{"kind":"folder","buttons":[{"id":"inner","label":"Inner","action":{"kind":"folder","buttons":[]}}]}}]}]}""")]
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"f","label":"Streaming","action":{"kind":"folder","buttons":[{"id":"f","label":"Same id","action":{"kind":"media","media":"next"}}]}}]}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},"image":"../x"}]}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[],"wallpaper":"C:\\Windows"}]}""")]
     [InlineData("""["not","a","deck"]""")]
     public void BadDecksAreRefused(string json)
     {

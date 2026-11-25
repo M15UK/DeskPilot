@@ -96,6 +96,9 @@ class _DeckPageState extends State<DeckPage> {
   Map<String, List<double>> _history = const {};
   NowPlaying? _media;
   String? _folder;
+  // Pictures from the PC by id, and the ids already asked for.
+  Map<String, Uint8List> _pictures = const {};
+  Set<String> _askedPictures = const {};
   int _page = 0;
   bool _editing = false;
   bool _loading = true;
@@ -184,6 +187,11 @@ class _DeckPageState extends State<DeckPage> {
       switch (event) {
         case DeckChanged(:final deck):
           _deck = deck;
+          _askForPictures(from, deck);
+        case PictureArrived(:final id, :final bytes?):
+          _pictures = {..._pictures, id: bytes};
+        case PictureArrived():
+          break; // the PC doesn't have it; the button shows its icon
         case StatsChanged(:final stats):
           // Telemetry stops when you leave the track; don't keep showing the last lap.
           if (DateTime.now().difference(_telemetryAt) > _telemetryTimeout) {
@@ -200,6 +208,26 @@ class _DeckPageState extends State<DeckPage> {
           _status = text;
       }
     });
+  }
+
+  /// Asks the PC once for each picture the deck uses that the phone hasn't
+  /// got yet.
+  void _askForPictures(AgentConnection agent, Deck deck) {
+    final missing = deck.pictureIds.difference({
+      ..._pictures.keys,
+      ..._askedPictures,
+    });
+    if (missing.isEmpty) return;
+    _askedPictures = {..._askedPictures, ...missing};
+    missing.forEach(agent.getImage);
+  }
+
+  /// Keeps a picked photo here and on the PC, and returns its id.
+  String _savePicture(Uint8List bytes) {
+    final id = pictureId(bytes);
+    setState(() => _pictures = {..._pictures, id: bytes});
+    _agent?.saveImage(id, bytes);
+    return id;
   }
 
   void _save(Deck deck) {
@@ -223,6 +251,8 @@ class _DeckPageState extends State<DeckPage> {
       _history = const {};
       _media = null;
       _folder = null;
+      _pictures = const {};
+      _askedPictures = const {};
       _page = 0;
       _editing = false;
       _busy = false;
@@ -243,6 +273,8 @@ class _DeckPageState extends State<DeckPage> {
       _stats = const {};
       _telemetry = const {};
       _media = null;
+      // Ask again after reconnecting for any picture that hadn't arrived.
+      _askedPictures = const {};
       _status = 'Lost the connection to ${agent.pcName}';
     });
   }
@@ -383,6 +415,8 @@ class _DeckPageState extends State<DeckPage> {
                     _folder = null;
                   }),
                   folder: _folder,
+                  pictures: _pictures,
+                  onPicture: agent == null ? null : _savePicture,
                   onFolderChanged: (id) => setState(() => _folder = id),
                   stats: {..._stats, ..._telemetry},
                   history: _history,

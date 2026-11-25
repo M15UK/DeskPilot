@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/deck_view.dart';
 import 'package:deskpilot/tiles.dart';
@@ -352,6 +354,40 @@ void main() {
 
       expect(changed!.pages[0].buttons.last.action, isA<FolderAction>());
     });
+  });
+
+  testWidgets('puts your own picture on a button', (tester) async {
+    final png = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+    );
+    String? uploaded;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DeckView(
+            deck: deck,
+            page: 0,
+            editing: true,
+            onPress: null,
+            onChange: (deck) => changed = deck,
+            onPageChanged: _ignore,
+            pickPicture: ({required wallpaper}) async => png,
+            onPicture: (bytes) => uploaded = pictureId(bytes),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Play / Pause'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Choose picture'));
+    await tester.tap(find.text('Choose picture'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(uploaded, hasLength(16));
+    expect(changed!.pages[0].buttons.single.image, uploaded);
   });
 
   testWidgets('adds a page in edit mode', (tester) async {

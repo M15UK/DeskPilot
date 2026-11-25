@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:deskpilot/deck.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,10 +9,10 @@ const pcDeck =
     '{"pages":[{"name":"Main","buttons":['
     '{"id":"previous","label":"Previous","action":{"kind":"media","media":"previous"}},'
     '{"id":"play-pause","label":"Play / Pause","action":{"kind":"media","media":"playPause"}},'
-    '{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]},"icon":"flag","color":"amber","show":"icon"},'
+    '{"id":"pit","label":"Pit","action":{"kind":"keys","combos":["Ctrl+P","Enter"]},"icon":"flag","color":"amber","show":"icon","image":"0123456789abcdef"},'
     '{"id":"ac","label":"Assetto Corsa","action":{"kind":"open","target":"steam://rungameid/244210"}},'
     '{"id":"cpu","label":"CPU","action":{"kind":"stat","stat":"cpuLoad","style":"gauge"},"size":"wide","style":"outline"}'
-    '],"size":"large","icon":"home","background":"blue"}]}';
+    '],"size":"large","icon":"home","background":"blue","wallpaper":"fedcba9876543210"}]}';
 
 Deck sample() => Deck.fromJson(jsonDecode(pcDeck))!;
 
@@ -173,6 +174,15 @@ void main() {
       ['b', 'a'],
       reason: 'an edited button stays inside its folder',
     );
+  });
+
+  test('a picture id is the start of its SHA-256, like on the PC', () {
+    // The same bytes and id as ImageStoreTests on the PC.
+    expect(
+      pictureId(Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3])),
+      matches(RegExp(r'^[0-9a-f]{16}$')),
+    );
+    expect(pictureId(Uint8List.fromList([1, 2, 3])), '039058c6f2c0cb49');
   });
 
   test('new button ids are unique', () {

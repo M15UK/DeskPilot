@@ -14,6 +14,7 @@ public sealed record AgentServices(
     Feed<PcStats> Stats,
     Feed<SimTelemetry> Telemetry,
     Feed<NowPlaying> Media,
+    ImageStore Images,
     Func<ButtonAction, Task> Run);
 
 /// <summary>The result of a phone's first message: whether it may stay, and what to send it.</summary>
@@ -75,7 +76,8 @@ public static class AgentServer
     }
 
     /// <summary>Runs one message from a signed in phone and returns the reply, or null when there is none.</summary>
-    public static async Task<string?> HandleAsync(ReadOnlyMemory<byte> message, DeckStore decks, Func<ButtonAction, Task> run)
+    public static async Task<string?> HandleAsync(ReadOnlyMemory<byte> message, DeckStore decks, ImageStore images,
+        Func<ButtonAction, Task> run)
     {
         var request = ParseObject(message.Span);
         switch (Text(request, "type"))
@@ -86,6 +88,12 @@ public static class AgentServer
                     : Error("That button is not on the deck any more.");
             case "mediaKey" when Text(request, "media") is { } key && Media.Knows(key):
                 return await RunAsync(run, new MediaAction(key));
+            case "saveImage" when Text(request, "id") is { } id && Text(request, "data") is { } data:
+                return SaveImage(images, id, data);
+            case "getImage" when Text(request, "id") is { } id:
+                return images.Read(id) is { } picture
+                    ? JsonSerializer.Serialize(new { type = "image", id, data = Convert.ToBase64String(picture) })
+                    : JsonSerializer.Serialize(new { type = "image", id }); // no data: the phone stops asking
             case "saveDeck" when request is { } body && body.TryGetProperty("deck", out var json):
                 if (Deck.Read(json, out var problem) is not { } deck)
                 {
@@ -96,6 +104,20 @@ public static class AgentServer
             default:
                 return Error("Unknown message");
         }
+    }
+
+    static string? SaveImage(ImageStore images, string id, string data)
+    {
+        byte[] bytes;
+        try
+        {
+            bytes = Convert.FromBase64String(data);
+        }
+        catch (FormatException)
+        {
+            return Error("That picture arrived damaged. Try again.");
+        }
+        return images.Save(id, bytes) is { } problem ? Error(problem) : null;
     }
 
     static async Task<string?> RunAsync(Func<ButtonAction, Task> run, ButtonAction action)

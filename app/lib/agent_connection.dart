@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -126,6 +127,13 @@ class AgentConnection {
   /// Presses a media key on the PC, for the music card's buttons.
   void mediaKey(String media) => _send({'type': 'mediaKey', 'media': media});
 
+  /// Keeps a picture on the PC under its [pictureId].
+  void saveImage(String id, Uint8List bytes) =>
+      _send({'type': 'saveImage', 'id': id, 'data': base64Encode(bytes)});
+
+  /// Asks the PC for a picture; it comes back as [PictureArrived].
+  void getImage(String id) => _send({'type': 'getImage', 'id': id});
+
   void saveDeck(Deck deck) =>
       _send({'type': 'saveDeck', 'deck': deck.toJson()});
 
@@ -168,6 +176,14 @@ final class MediaChanged extends AgentEvent {
   final NowPlaying? media;
 }
 
+/// A picture the phone asked for, or null bytes when the PC doesn't have it.
+final class PictureArrived extends AgentEvent {
+  const PictureArrived(this.id, this.bytes);
+
+  final String id;
+  final Uint8List? bytes;
+}
+
 /// A message for the user, usually why something didn't work.
 final class PcSays extends AgentEvent {
   const PcSays(this.text);
@@ -201,9 +217,22 @@ AgentEvent readEvent(String message) {
         DateTime.now(),
       ),
     ),
+    {'type': 'image', 'id': final String id} => PictureArrived(
+      id,
+      _bytes((json as Map<String, Object?>)['data']),
+    ),
     {'type': 'error', 'message': final String text} => PcSays(text),
     _ => const PcSays('Unexpected message from the PC'),
   };
+}
+
+Uint8List? _bytes(Object? base64) {
+  if (base64 is! String) return null;
+  try {
+    return base64Decode(base64);
+  } on FormatException {
+    return null;
+  }
 }
 
 /// The readings in a message, skipping anything that isn't a number.

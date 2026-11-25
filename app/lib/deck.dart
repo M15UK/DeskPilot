@@ -1,4 +1,7 @@
 import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart';
 
 /// The media keys the PC can press, and how the app shows them.
 const mediaKeys = {
@@ -140,6 +143,7 @@ class DeckButton {
     this.size,
     this.style,
     this.show,
+    this.image,
   });
 
   final String id;
@@ -151,6 +155,9 @@ class DeckButton {
   final String? style;
   final String? show;
 
+  /// The id of the button's own picture on the PC (see [pictureId]).
+  final String? image;
+
   Map<String, Object> toJson() => {
     'id': id,
     'label': label,
@@ -160,6 +167,7 @@ class DeckButton {
     'size': ?size,
     'style': ?style,
     'show': ?show,
+    'image': ?image,
   };
 
   DeckButton _withAction(ButtonAction action) => DeckButton(
@@ -171,6 +179,7 @@ class DeckButton {
     size: size,
     style: style,
     show: show,
+    image: image,
   );
 
   static DeckButton? fromJson(Object? json) {
@@ -191,6 +200,7 @@ class DeckButton {
           size: _text(map['size']),
           style: _text(map['style']),
           show: _text(map['show']),
+          image: _text(map['image']),
         );
       }
     }
@@ -207,6 +217,7 @@ class DeckPage {
     this.size,
     this.icon,
     this.background,
+    this.wallpaper,
   });
 
   final String name;
@@ -215,12 +226,16 @@ class DeckPage {
   final String? icon;
   final String? background;
 
+  /// The id of a picture behind the page's buttons (see [pictureId]).
+  final String? wallpaper;
+
   Map<String, Object> toJson() => {
     'name': name,
     'buttons': [for (final button in buttons) button.toJson()],
     'size': ?size,
     'icon': ?icon,
     'background': ?background,
+    'wallpaper': ?wallpaper,
   };
 
   static DeckPage? fromJson(Object? json) {
@@ -238,6 +253,7 @@ class DeckPage {
           size: _text(map['size']),
           icon: _text(map['icon']),
           background: _text(map['background']),
+          wallpaper: _text(map['wallpaper']),
         );
       }
     }
@@ -250,6 +266,7 @@ class DeckPage {
     size: size,
     icon: icon,
     background: background,
+    wallpaper: wallpaper,
   );
 }
 
@@ -368,6 +385,7 @@ class Deck {
     String? size,
     String? icon,
     String? background,
+    String? wallpaper,
   }) => _editPage(
     page,
     (p) => DeckPage(
@@ -376,8 +394,21 @@ class Deck {
       size: size,
       icon: icon,
       background: background,
+      wallpaper: wallpaper,
     ),
   );
+
+  /// Every picture the deck uses, on buttons, in folders and behind pages.
+  Set<String> get pictureIds => {
+    for (final page in pages) ...[
+      ?page.wallpaper,
+      for (final button in page.buttons) ...[
+        ?button.image,
+        if (button.action case FolderAction(:final buttons))
+          for (final inside in buttons) ?inside.image,
+      ],
+    ],
+  };
 
   Deck withoutPage(int page) => Deck(
     List.unmodifiable([
@@ -420,6 +451,10 @@ List<T>? _readAll<T>(List<Object?> items, T? Function(Object?) read) {
 }
 
 final _random = Random.secure();
+
+/// A picture's id: the start of its SHA-256, the same as the PC names it.
+String pictureId(Uint8List bytes) =>
+    sha256.convert(bytes).toString().substring(0, 16);
 
 /// A random id for a new button.
 String newButtonId() => [

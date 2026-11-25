@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/look.dart';
+import 'package:deskpilot/pictures.dart';
 import 'package:deskpilot/tiles.dart';
 import 'package:flutter/material.dart';
 
@@ -42,12 +45,29 @@ final class MoveButton extends ButtonEdit {
 
 /// Adds a new button, or changes, moves or deletes [button].
 class ButtonEditor extends StatefulWidget {
-  const ButtonEditor({super.key, this.button, this.canBeFolder = true});
+  const ButtonEditor({
+    super.key,
+    this.button,
+    this.canBeFolder = true,
+    this.pictures = const {},
+    this.pickPicture,
+    this.onPicture,
+  });
 
   final DeckButton? button;
 
   /// False inside a folder: folders don't hold folders.
   final bool canBeFolder;
+
+  /// Pictures the phone already has, by id.
+  final Map<String, Uint8List> pictures;
+
+  /// Picks a photo; the phone's gallery when null.
+  final PickPicture? pickPicture;
+
+  /// Sends a picked photo to the PC and returns its id. Null hides pictures,
+  /// for example while the PC isn't connected.
+  final String Function(Uint8List)? onPicture;
 
   @override
   State<ButtonEditor> createState() => _ButtonEditorState();
@@ -93,6 +113,11 @@ class _ButtonEditorState extends State<ButtonEditor> {
   late String? _size = widget.button?.size;
   late String? _look = widget.button?.style;
   late String? _show = widget.button?.show;
+  late String? _image = widget.button?.image;
+  Uint8List? _picked;
+
+  Uint8List? get _picture =>
+      _image == null ? null : _picked ?? widget.pictures[_image];
 
   @override
   void dispose() {
@@ -140,6 +165,7 @@ class _ButtonEditorState extends State<ButtonEditor> {
       // Stat tiles always show their reading the same way.
       style: action is StatAction ? null : _look,
       show: action is StatAction ? null : _show,
+      image: action is StatAction ? null : _image,
     );
   }
 
@@ -170,6 +196,7 @@ class _ButtonEditorState extends State<ButtonEditor> {
             color: buttonColor(button),
             style: button.style,
             show: button.show,
+            picture: _picture,
             onTap: () {},
           ),
         },
@@ -332,6 +359,19 @@ class _ButtonEditorState extends State<ButtonEditor> {
               },
               if (_kind != 'stat') _iconPicker(),
               _colorPicker(),
+              if (widget.onPicture case final upload? when _kind != 'stat')
+                _PictureField(
+                  noun: 'picture',
+                  wallpaper: false,
+                  picture: _picture,
+                  chosen: _image != null,
+                  pick: widget.pickPicture ?? pickFromGallery,
+                  upload: upload,
+                  onChanged: (id, bytes) => setState(() {
+                    _image = id;
+                    _picked = bytes;
+                  }),
+                ),
               _Options(
                 title: 'Shape',
                 choices: buttonSizes,
@@ -397,12 +437,19 @@ sealed class PageEdit {
 
 /// The page's name and look, to save.
 final class SavePage extends PageEdit {
-  const SavePage({required this.name, this.size, this.icon, this.background});
+  const SavePage({
+    required this.name,
+    this.size,
+    this.icon,
+    this.background,
+    this.wallpaper,
+  });
 
   final String name;
   final String? size;
   final String? icon;
   final String? background;
+  final String? wallpaper;
 }
 
 final class DeletePage extends PageEdit {
@@ -417,11 +464,17 @@ class PageEditor extends StatefulWidget {
     required this.title,
     this.page,
     this.canDelete = false,
+    this.pictures = const {},
+    this.pickPicture,
+    this.onPicture,
   });
 
   final String title;
   final DeckPage? page;
   final bool canDelete;
+  final Map<String, Uint8List> pictures;
+  final PickPicture? pickPicture;
+  final String Function(Uint8List)? onPicture;
 
   @override
   State<PageEditor> createState() => _PageEditorState();
@@ -433,6 +486,8 @@ class _PageEditorState extends State<PageEditor> {
   late String? _size = widget.page?.size;
   late String? _icon = widget.page?.icon;
   late String? _background = widget.page?.background;
+  late String? _wallpaper = widget.page?.wallpaper;
+  Uint8List? _picked;
 
   @override
   void dispose() {
@@ -448,6 +503,7 @@ class _PageEditorState extends State<PageEditor> {
         size: _size,
         icon: _icon,
         background: _background,
+        wallpaper: _wallpaper,
       ),
     );
   }
@@ -513,6 +569,21 @@ class _PageEditorState extends State<PageEditor> {
                   ),
               ],
             ),
+            if (widget.onPicture case final upload?)
+              _PictureField(
+                noun: 'wallpaper',
+                wallpaper: true,
+                picture: _wallpaper == null
+                    ? null
+                    : _picked ?? widget.pictures[_wallpaper],
+                chosen: _wallpaper != null,
+                pick: widget.pickPicture ?? pickFromGallery,
+                upload: upload,
+                onChanged: (id, bytes) => setState(() {
+                  _wallpaper = id;
+                  _picked = bytes;
+                }),
+              ),
           ],
         ),
       ),
@@ -633,4 +704,91 @@ class _Choice extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Choose, change or remove a picture: a button's own or a page's wallpaper.
+class _PictureField extends StatefulWidget {
+  const _PictureField({
+    required this.noun,
+    required this.wallpaper,
+    required this.picture,
+    required this.chosen,
+    required this.pick,
+    required this.upload,
+    required this.onChanged,
+  });
+
+  final String noun;
+  final bool wallpaper;
+  final Uint8List? picture;
+  final bool chosen;
+  final PickPicture pick;
+  final String Function(Uint8List) upload;
+
+  /// The new picture's id and bytes, or nulls when it was removed.
+  final void Function(String? id, Uint8List? bytes) onChanged;
+
+  @override
+  State<_PictureField> createState() => _PictureFieldState();
+}
+
+class _PictureFieldState extends State<_PictureField> {
+  String? _problem;
+
+  Future<void> _choose() async {
+    final bytes = await widget.pick(wallpaper: widget.wallpaper);
+    if (bytes == null || !mounted) return;
+    if (bytes.length > maxPictureBytes) {
+      setState(() => _problem = 'That picture is too big. Pick a smaller one.');
+      return;
+    }
+    setState(() => _problem = null);
+    widget.onChanged(widget.upload(bytes), bytes);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final picture = widget.picture;
+    final problem = _problem;
+    final noun = widget.noun;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 8,
+      children: [
+        Text(
+          noun[0].toUpperCase() + noun.substring(1),
+          style: TextStyle(color: DeckLook.of(context).muted, fontSize: 12),
+        ),
+        Row(
+          spacing: 10,
+          children: [
+            if (picture != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox.square(
+                  dimension: 48,
+                  child: Image.memory(
+                    picture,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            OutlinedButton.icon(
+              onPressed: _choose,
+              icon: const Icon(Icons.image_rounded),
+              label: Text(widget.chosen ? 'Change $noun' : 'Choose $noun'),
+            ),
+            if (widget.chosen)
+              TextButton(
+                onPressed: () => widget.onChanged(null, null),
+                child: const Text('Remove'),
+              ),
+          ],
+        ),
+        if (problem != null)
+          Text(problem, style: TextStyle(color: deckColors['red'])),
+      ],
+    );
+  }
 }
