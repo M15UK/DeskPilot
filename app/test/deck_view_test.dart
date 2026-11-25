@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/deck_view.dart';
+import 'package:deskpilot/now_playing.dart';
 import 'package:deskpilot/tiles.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -66,32 +67,118 @@ void main() {
     expect(pressed, isNull);
   });
 
-  testWidgets('the music card sits beside the page rail, not above it', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: DeckView(
-            deck: deck,
-            page: 0,
-            editing: false,
-            onPress: null,
-            onChange: _ignore,
-            onPageChanged: _ignore,
-            header: Text('Now playing'),
+  group('widgets', () {
+    const home = Deck([
+      DeckPage(
+        name: 'Main',
+        buttons: [
+          DeckButton(
+            id: 'm',
+            label: 'Music',
+            action: MusicAction(),
+            size: 'wider',
           ),
-        ),
+          DeckButton(id: 'c', label: 'Clock', action: ClockAction()),
+        ],
       ),
+    ]);
+    final song = NowPlaying(
+      title: 'Neon Highway',
+      artist: 'The Midnight Drive',
+      app: 'Spotify',
+      playing: true,
+      receivedAt: DateTime(2026),
     );
 
-    final rail = tester.getTopRight(find.text('Main'));
-    final header = tester.getTopLeft(find.text('Now playing'));
-    expect(header.dx, greaterThan(rail.dx));
-    expect(
-      header.dy,
-      lessThan(tester.getTopLeft(find.text('Play / Pause')).dy),
-    );
+    testWidgets('show the song and the PC, and the music keys work', (
+      tester,
+    ) async {
+      String? key;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DeckView(
+              deck: home,
+              page: 0,
+              editing: false,
+              onPress: _ignore,
+              onChange: _ignore,
+              onPageChanged: _ignore,
+              media: song,
+              onMediaKey: (pressed) => key = pressed,
+              pcName: 'GAMING-PC',
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Neon Highway'), findsOneWidget);
+      expect(find.text('GAMING-PC'), findsOneWidget);
+      await tester.tap(find.byTooltip('Next'));
+      expect(key, 'next');
+    });
+
+    testWidgets('a music widget is three places wide', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 900,
+              child: DeckView(
+                deck: home,
+                page: 0,
+                editing: false,
+                onPress: null,
+                onChange: _ignore,
+                onPageChanged: _ignore,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final music = tester.getSize(find.byType(NowPlayingCard));
+      final clock = tester.getSize(find.byType(ClockTile));
+      expect(music.width, greaterThan(clock.width * 2.5));
+    });
+
+    testWidgets('can be added from the editor, with photos', (tester) async {
+      final png = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DeckView(
+              deck: deck,
+              page: 0,
+              editing: true,
+              onPress: null,
+              onChange: (deck) => changed = deck,
+              onPageChanged: _ignore,
+              pickPicture: ({required wallpaper}) async => png,
+              onPicture: pictureId,
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Add button'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Widget'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Photos'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Photos'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Add photo'));
+      await tester.tap(find.text('Add photo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final added = changed!.pages[0].buttons.last.action as PhotosAction;
+      expect(added.pictures, [pictureId(png)]);
+    });
   });
 
   testWidgets('the page chips switch pages', (tester) async {

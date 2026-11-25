@@ -104,63 +104,163 @@ String _clock(double seconds) {
   return '${whole ~/ 60}:${(whole % 60).toString().padLeft(2, '0')}';
 }
 
-/// The music card: cover art, title, artist, progress and controls. The
-/// buttons are off while [onKey] is null (the PC isn't connected).
+/// The music card: cover art, title, artist, progress and controls, laid
+/// out for its tile: a row when wide, the cover with a play button when
+/// small. Without [media] it says nothing is playing. The buttons are off
+/// while [onKey] is null (the PC isn't connected, or the deck is being edited).
 class NowPlayingCard extends StatelessWidget {
   const NowPlayingCard({super.key, required this.media, required this.onKey});
 
-  final NowPlaying media;
+  final NowPlaying? media;
   final ValueChanged<String>? onKey;
 
   @override
   Widget build(BuildContext context) {
-    final position = media.positionAt(DateTime.now());
-    final duration = media.duration;
-    final key = onKey;
     final look = DeckLook.of(context);
     // The card takes a little of the theme's accent color.
     final tint = Color.alphaBlend(
       look.accent.withValues(alpha: 0.10),
       look.card,
     );
-    final soft = Color.lerp(look.muted, look.text, 0.5)!;
-    final faint = look.muted;
     return Container(
-      padding: const EdgeInsets.all(12),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: tint,
-        borderRadius: BorderRadius.circular(DeckLook.of(context).radius),
+        borderRadius: BorderRadius.circular(look.radius),
         border: Border.all(color: look.cardBorder),
       ),
+      child: LayoutBuilder(
+        builder: (context, size) => switch (media) {
+          null => Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 6,
+              children: [
+                Icon(Icons.music_note_rounded, color: look.muted, size: 32),
+                Text('Nothing playing', style: TextStyle(color: look.muted)),
+              ],
+            ),
+          ),
+          final song when size.maxWidth < 300 => _Compact(
+            media: song,
+            onKey: onKey,
+          ),
+          final song => _Wide(
+            media: song,
+            onKey: onKey,
+            tint: tint,
+            cover: (size.maxHeight - 24).clamp(56, 180).toDouble(),
+          ),
+        },
+      ),
+    );
+  }
+}
+
+Widget _cover(NowPlaying media) => switch (media.cover) {
+  final Uint8List cover => Image.memory(
+    cover,
+    fit: BoxFit.cover,
+    gaplessPlayback: true,
+    semanticLabel: 'Album cover',
+    errorBuilder: (_, _, _) => const _NoCover(),
+  ),
+  null => const _NoCover(),
+};
+
+/// A small tile: the cover fills it, with the title and play button on a
+/// dark strip.
+class _Compact extends StatelessWidget {
+  const _Compact({required this.media, required this.onKey});
+
+  final NowPlaying media;
+  final ValueChanged<String>? onKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final key = onKey;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _cover(media),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            color: Colors.black.withValues(alpha: 0.6),
+            padding: const EdgeInsets.only(left: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    media.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: media.playing ? 'Pause' : 'Play',
+                  color: Colors.white,
+                  onPressed: key == null ? null : () => key('playPause'),
+                  icon: Icon(
+                    media.playing
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A wide tile: the cover beside the title, artist, progress and controls.
+class _Wide extends StatelessWidget {
+  const _Wide({
+    required this.media,
+    required this.onKey,
+    required this.tint,
+    required this.cover,
+  });
+
+  final NowPlaying media;
+  final ValueChanged<String>? onKey;
+  final Color tint;
+  final double cover;
+
+  @override
+  Widget build(BuildContext context) {
+    final look = DeckLook.of(context);
+    final soft = Color.lerp(look.muted, look.text, 0.5)!;
+    final position = media.positionAt(DateTime.now());
+    final duration = media.duration;
+    final key = onKey;
+    return Padding(
+      padding: const EdgeInsets.all(12),
       child: Row(
         spacing: 14,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox.square(
-              dimension: 112,
-              child: switch (media.cover) {
-                final Uint8List cover => Image.memory(
-                  cover,
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                  semanticLabel: 'Album cover',
-                  errorBuilder: (_, _, _) => const _NoCover(),
-                ),
-                null => const _NoCover(),
-              },
-            ),
+            borderRadius: BorderRadius.circular(look.radius * 0.6),
+            child: SizedBox.square(dimension: cover, child: _cover(media)),
           ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   'Playing on your PC, ${media.app}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: faint, fontSize: 11),
+                  style: TextStyle(color: look.muted, fontSize: 11),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -168,7 +268,7 @@ class NowPlayingCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: DeckLook.of(context).text,
+                    color: look.text,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -186,13 +286,13 @@ class NowPlayingCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: position / duration,
                       minHeight: 4,
-                      color: DeckLook.of(context).text,
+                      color: look.text,
                       backgroundColor: look.cardBorder,
                     ),
                   ),
                   const SizedBox(height: 2),
                   DefaultTextStyle(
-                    style: TextStyle(color: faint, fontSize: 11),
+                    style: TextStyle(color: look.muted, fontSize: 11),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -202,34 +302,38 @@ class NowPlayingCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'Previous',
-                      color: soft,
-                      onPressed: key == null ? null : () => key('previous'),
-                      icon: const Icon(Icons.skip_previous_rounded),
-                    ),
-                    IconButton.filled(
-                      tooltip: media.playing ? 'Pause' : 'Play',
-                      style: IconButton.styleFrom(
-                        backgroundColor: DeckLook.of(context).text,
-                        foregroundColor: tint,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Previous',
+                        color: soft,
+                        onPressed: key == null ? null : () => key('previous'),
+                        icon: const Icon(Icons.skip_previous_rounded),
                       ),
-                      onPressed: key == null ? null : () => key('playPause'),
-                      icon: Icon(
-                        media.playing
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
+                      IconButton.filled(
+                        tooltip: media.playing ? 'Pause' : 'Play',
+                        style: IconButton.styleFrom(
+                          backgroundColor: look.text,
+                          foregroundColor: tint,
+                        ),
+                        onPressed: key == null ? null : () => key('playPause'),
+                        icon: Icon(
+                          media.playing
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'Next',
-                      color: soft,
-                      onPressed: key == null ? null : () => key('next'),
-                      icon: const Icon(Icons.skip_next_rounded),
-                    ),
-                  ],
+                      IconButton(
+                        tooltip: 'Next',
+                        color: soft,
+                        onPressed: key == null ? null : () => key('next'),
+                        icon: const Icon(Icons.skip_next_rounded),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

@@ -28,6 +28,23 @@ void main() {
     expect(find.text('Load a backup'), findsOneWidget);
   });
 
+  testWidgets('says so when the tablet has no vibration motor', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsPage(
+          settings: const AppSettings(),
+          onChanged: (_) {},
+          pcName: null,
+          onForget: () {},
+          canVibrate: false,
+        ),
+      ),
+    );
+
+    await tester.scrollUntilVisible(find.text('Vibrate'), 200);
+    expect(find.textContaining('no vibration motor'), findsOneWidget);
+  });
+
   testWidgets('picks a theme', (tester) async {
     await tester.pumpWidget(host());
 
@@ -37,16 +54,34 @@ void main() {
     expect(saved.theme, 'neon');
   });
 
-  testWidgets('turns on full screen and big PC cards', (tester) async {
+  testWidgets('turns on full screen', (tester) async {
     await tester.pumpWidget(host());
 
     await tester.tap(find.text('Full screen'));
     await tester.pump();
-    await tester.scrollUntilVisible(find.text('Big PC cards'), 200);
-    await tester.tap(find.text('Big PC cards'));
-    await tester.pump();
 
-    expect((saved.fullScreen, saved.bigPcCards), (true, true));
+    expect(saved.fullScreen, isTrue);
+  });
+
+  testWidgets('puts music and clock on the first page', (tester) async {
+    var added = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsPage(
+          settings: const AppSettings(),
+          onChanged: (_) {},
+          pcName: 'GAMING-PC',
+          onForget: () {},
+          onAddHomeWidgets: () => added = true,
+        ),
+      ),
+    );
+
+    final button = find.text('Add music and clock to the first page');
+    await tester.scrollUntilVisible(button, 200);
+    await tester.tap(button);
+
+    expect(added, isTrue);
   });
 
   testWidgets('square corners and tight spacing', (tester) async {

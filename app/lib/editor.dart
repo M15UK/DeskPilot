@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 
+import 'package:deskpilot/choices.dart';
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/look.dart';
+import 'package:deskpilot/now_playing.dart';
 import 'package:deskpilot/pictures.dart';
 import 'package:deskpilot/tiles.dart';
 import 'package:flutter/material.dart';
@@ -93,8 +95,20 @@ class _ButtonEditorState extends State<ButtonEditor> {
     OpenAction() => 'open',
     StatAction() => 'stat',
     FolderAction() => 'folder',
+    MusicAction() || ClockAction() || PhotosAction() => 'widget',
     _ => 'media',
   };
+  late String _widget = switch (widget.button?.action) {
+    ClockAction() => 'clock',
+    PhotosAction() => 'photos',
+    _ => 'music',
+  };
+  late List<String> _photos = switch (widget.button?.action) {
+    PhotosAction(:final pictures) => pictures,
+    _ => const [],
+  };
+  Map<String, Uint8List> _photoBytes = const {};
+  String? _photoProblem;
   late String _stat = switch (widget.button?.action) {
     StatAction(:final stat) => stat,
     _ => 'cpuLoad',
@@ -142,8 +156,95 @@ class _ButtonEditorState extends State<ButtonEditor> {
       FolderAction(:final buttons) => buttons,
       _ => const [],
     }),
+    'widget' => switch (_widget) {
+      'clock' => const ClockAction(),
+      'photos' => PhotosAction(List.unmodifiable(_photos)),
+      _ => const MusicAction(),
+    },
     _ => MediaAction(_media),
   };
+
+  /// The photos of a photo widget that the phone has, in order.
+  List<Uint8List> get _photoPictures => [
+    for (final id in _photos) ?(_photoBytes[id] ?? widget.pictures[id]),
+  ];
+
+  Future<void> _addPhoto() async {
+    final upload = widget.onPicture;
+    if (upload == null) return;
+    final bytes = await (widget.pickPicture ?? pickFromGallery)(
+      wallpaper: true,
+    );
+    if (bytes == null || !mounted) return;
+    if (bytes.length > maxPictureBytes) {
+      setState(() => _photoProblem = 'That photo is too big. Pick another.');
+      return;
+    }
+    final id = upload(bytes);
+    setState(() {
+      _photoProblem = null;
+      _photos = [..._photos, id];
+      _photoBytes = {..._photoBytes, id: bytes};
+    });
+  }
+
+  /// The photos in a photo widget, each with a way to take it out, and a
+  /// button to add more.
+  Widget _photosField() {
+    final problem = _photoProblem;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 8,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final (index, id) in _photos.indexed)
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox.square(
+                      dimension: 64,
+                      child: switch (_photoBytes[id] ?? widget.pictures[id]) {
+                        final Uint8List bytes => Image.memory(
+                          bytes,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                        ),
+                        null => const Icon(Icons.photo_rounded),
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: IconButton.filledTonal(
+                      tooltip: 'Take out photo ${index + 1}',
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 16,
+                      onPressed: () => setState(
+                        () => _photos = [..._photos]..removeAt(index),
+                      ),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+        if (widget.onPicture != null && _photos.length < 30)
+          OutlinedButton.icon(
+            onPressed: _addPhoto,
+            icon: const Icon(Icons.add_photo_alternate_rounded),
+            label: const Text('Add photo'),
+          ),
+        if (problem != null)
+          Text(problem, style: TextStyle(color: deckColors['red'])),
+      ],
+    );
+  }
 
   /// How many buttons the folder being edited holds, or null when it isn't
   /// a folder.
@@ -155,17 +256,19 @@ class _ButtonEditorState extends State<ButtonEditor> {
   DeckButton _button(String id) {
     final action = _action();
     final label = _label.text.trim();
+    // Widgets draw themselves; stat tiles always show their reading one way.
+    final widgetTile = _kind == 'widget';
+    final plain = widgetTile || action is StatAction;
     return DeckButton(
       id: id,
       label: label.isEmpty ? autoLabel(action) : label,
       action: action,
-      icon: _icon,
-      color: _color,
+      icon: widgetTile ? null : _icon,
+      color: widgetTile ? null : _color,
       size: _size,
-      // Stat tiles always show their reading the same way.
-      style: action is StatAction ? null : _look,
-      show: action is StatAction ? null : _show,
-      image: action is StatAction ? null : _image,
+      style: plain ? null : _look,
+      show: plain ? null : _show,
+      image: plain ? null : _image,
     );
   }
 
@@ -182,6 +285,9 @@ class _ButtonEditorState extends State<ButtonEditor> {
       child: SizedBox.square(
         dimension: 120,
         child: switch (button.action) {
+          MusicAction() => const NowPlayingCard(media: null, onKey: null),
+          ClockAction() => const ClockTile(pcName: null, stats: {}),
+          PhotosAction() => PhotosTile(pictures: _photoPictures),
           final StatAction stat => StatTile(
             label: button.label,
             action: stat,
@@ -204,17 +310,17 @@ class _ButtonEditorState extends State<ButtonEditor> {
     );
   }
 
-  Widget _iconPicker() => _Choices(
+  Widget _iconPicker() => ChoiceRow(
     title: 'Icon',
     choices: [
-      _Choice(
+      ChoiceSquare(
         name: 'Automatic',
         selected: _icon == null,
         onTap: () => setState(() => _icon = null),
         child: const Icon(Icons.auto_awesome_rounded),
       ),
       for (final MapEntry(:key, :value) in deckIcons.entries)
-        _Choice(
+        ChoiceSquare(
           name: key.replaceAll('_', ' '),
           selected: _icon == key,
           onTap: () => setState(() => _icon = key),
@@ -223,17 +329,17 @@ class _ButtonEditorState extends State<ButtonEditor> {
     ],
   );
 
-  Widget _colorPicker() => _Choices(
+  Widget _colorPicker() => ChoiceRow(
     title: 'Color',
     choices: [
-      _Choice(
+      ChoiceSquare(
         name: 'Automatic',
         selected: _color == null,
         onTap: () => setState(() => _color = null),
         child: const Icon(Icons.auto_awesome_rounded),
       ),
       for (final MapEntry(:key, :value) in deckColors.entries)
-        _Choice(
+        ChoiceSquare(
           name: key,
           selected: _color == key,
           onTap: () => setState(() => _color = key),
@@ -274,23 +380,47 @@ class _ButtonEditorState extends State<ButtonEditor> {
                   'or delete it to remove them all.',
                 )
               else
-                SegmentedButton<String>(
-                  segments: [
-                    const ButtonSegment(value: 'media', label: Text('Media')),
-                    const ButtonSegment(value: 'keys', label: Text('Keys')),
-                    const ButtonSegment(value: 'open', label: Text('Open')),
-                    const ButtonSegment(value: 'stat', label: Text('Stat')),
-                    if (widget.canBeFolder)
-                      const ButtonSegment(
-                        value: 'folder',
-                        label: Text('Folder'),
-                      ),
-                  ],
-                  selected: {_kind},
-                  onSelectionChanged: (kinds) =>
-                      setState(() => _kind = kinds.single),
+                OptionChips(
+                  title: 'Type',
+                  choices: {
+                    'media': 'Media',
+                    'keys': 'Keys',
+                    'open': 'Open',
+                    'stat': 'Stat',
+                    if (widget.canBeFolder) 'folder': 'Folder',
+                    'widget': 'Widget',
+                  },
+                  selected: _kind,
+                  onSelect: (kind) => setState(() => _kind = kind ?? _kind),
                 ),
               switch (_kind) {
+                'widget' => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 12,
+                  children: [
+                    OptionChips(
+                      title: 'Widget',
+                      choices: const {
+                        'music': 'Music',
+                        'clock': 'Clock',
+                        'photos': 'Photos',
+                      },
+                      selected: _widget,
+                      onSelect: (picked) => setState(() {
+                        _widget = picked ?? _widget;
+                        // Music reads best wide; pick another shape any time.
+                        if (_widget == 'music') _size ??= 'wider';
+                      }),
+                    ),
+                    if (_widget == 'photos')
+                      _photosField()
+                    else
+                      const Text(
+                        'It shows on its own. Drag it where you like and pick '
+                        'its shape below.',
+                      ),
+                  ],
+                ),
                 'folder' => const Text(
                   'Tap the folder on your deck to open it. To add buttons, '
                   'open it from here in edit mode.',
@@ -357,10 +487,11 @@ class _ButtonEditorState extends State<ButtonEditor> {
                       setState(() => _media = media ?? _media),
                 ),
               },
-              if (_kind != 'stat') _iconPicker(),
-              _colorPicker(),
-              if (widget.onPicture case final upload? when _kind != 'stat')
-                _PictureField(
+              if (_kind != 'stat' && _kind != 'widget') _iconPicker(),
+              if (_kind != 'widget') _colorPicker(),
+              if (widget.onPicture case final upload?
+                  when _kind != 'stat' && _kind != 'widget')
+                PictureField(
                   noun: 'picture',
                   wallpaper: false,
                   picture: _picture,
@@ -372,20 +503,20 @@ class _ButtonEditorState extends State<ButtonEditor> {
                     _picked = bytes;
                   }),
                 ),
-              _Options(
+              OptionChips(
                 title: 'Shape',
                 choices: buttonSizes,
                 selected: _size,
                 onSelect: (size) => setState(() => _size = size),
               ),
-              if (_kind != 'stat') ...[
-                _Options(
+              if (_kind != 'stat' && _kind != 'widget') ...[
+                OptionChips(
                   title: 'Style',
                   choices: buttonStyles,
                   selected: _look,
                   onSelect: (look) => setState(() => _look = look),
                 ),
-                _Options(
+                OptionChips(
                   title: 'Show',
                   choices: buttonShows,
                   selected: _show,
@@ -531,23 +662,23 @@ class _PageEditorState extends State<PageEditor> {
               validator: (text) => _required(text, 'Give the page a name'),
               onFieldSubmitted: (_) => _save(),
             ),
-            _Options(
+            OptionChips(
               title: 'Button size',
               choices: pageSizes,
               selected: _size,
               onSelect: (size) => setState(() => _size = size),
             ),
-            _Choices(
+            ChoiceRow(
               title: 'Icon',
               choices: [
-                _Choice(
+                ChoiceSquare(
                   name: 'Automatic',
                   selected: _icon == null,
                   onTap: () => setState(() => _icon = null),
                   child: const Icon(Icons.auto_awesome_rounded),
                 ),
                 for (final MapEntry(:key, :value) in deckIcons.entries)
-                  _Choice(
+                  ChoiceSquare(
                     name: key.replaceAll('_', ' '),
                     selected: _icon == key,
                     onTap: () => setState(() => _icon = key),
@@ -555,17 +686,17 @@ class _PageEditorState extends State<PageEditor> {
                   ),
               ],
             ),
-            _Choices(
+            ChoiceRow(
               title: 'Background',
               choices: [
-                _Choice(
+                ChoiceSquare(
                   name: 'None',
                   selected: _background == null,
                   onTap: () => setState(() => _background = null),
                   child: const Icon(Icons.block_rounded),
                 ),
                 for (final MapEntry(:key, :value) in deckColors.entries)
-                  _Choice(
+                  ChoiceSquare(
                     name: key,
                     selected: _background == key,
                     onTap: () => setState(() => _background = key),
@@ -574,7 +705,7 @@ class _PageEditorState extends State<PageEditor> {
               ],
             ),
             if (widget.onPicture case final upload?)
-              _PictureField(
+              PictureField(
                 noun: 'wallpaper',
                 wallpaper: true,
                 picture: _wallpaper == null
@@ -613,194 +744,4 @@ class _PageEditorState extends State<PageEditor> {
       FilledButton(onPressed: _save, child: const Text('Save')),
     ],
   );
-}
-
-/// A titled row of chips to pick one of [choices] (value to its name).
-class _Options extends StatelessWidget {
-  const _Options({
-    required this.title,
-    required this.choices,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final String title;
-  final Map<String?, String> choices;
-  final String? selected;
-  final ValueChanged<String?> onSelect;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    spacing: 8,
-    children: [
-      Text(
-        title,
-        style: TextStyle(color: DeckLook.of(context).muted, fontSize: 12),
-      ),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final MapEntry(:key, :value) in choices.entries)
-            ChoiceChip(
-              label: Text(value),
-              selected: selected == key,
-              onSelected: (_) => onSelect(key),
-            ),
-        ],
-      ),
-    ],
-  );
-}
-
-/// A titled row of small square choices, like icons or colors.
-class _Choices extends StatelessWidget {
-  const _Choices({required this.title, required this.choices});
-
-  final String title;
-  final List<_Choice> choices;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    spacing: 8,
-    children: [
-      Text(
-        title,
-        style: TextStyle(color: DeckLook.of(context).muted, fontSize: 12),
-      ),
-      Wrap(spacing: 6, runSpacing: 6, children: choices),
-    ],
-  );
-}
-
-class _Choice extends StatelessWidget {
-  const _Choice({
-    required this.name,
-    required this.selected,
-    required this.onTap,
-    required this.child,
-  });
-
-  final String name;
-  final bool selected;
-  final VoidCallback onTap;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Tooltip(
-    message: name,
-    child: Semantics(
-      selected: selected,
-      button: true,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          width: 40,
-          height: 40,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: DeckLook.of(context).background,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: selected
-                  ? DeckLook.of(context).text
-                  : DeckLook.of(context).cardBorder,
-              width: selected ? 2 : 1,
-            ),
-          ),
-          child: child,
-        ),
-      ),
-    ),
-  );
-}
-
-/// Choose, change or remove a picture: a button's own or a page's wallpaper.
-class _PictureField extends StatefulWidget {
-  const _PictureField({
-    required this.noun,
-    required this.wallpaper,
-    required this.picture,
-    required this.chosen,
-    required this.pick,
-    required this.upload,
-    required this.onChanged,
-  });
-
-  final String noun;
-  final bool wallpaper;
-  final Uint8List? picture;
-  final bool chosen;
-  final PickPicture pick;
-  final String Function(Uint8List) upload;
-
-  /// The new picture's id and bytes, or nulls when it was removed.
-  final void Function(String? id, Uint8List? bytes) onChanged;
-
-  @override
-  State<_PictureField> createState() => _PictureFieldState();
-}
-
-class _PictureFieldState extends State<_PictureField> {
-  String? _problem;
-
-  Future<void> _choose() async {
-    final bytes = await widget.pick(wallpaper: widget.wallpaper);
-    if (bytes == null || !mounted) return;
-    if (bytes.length > maxPictureBytes) {
-      setState(() => _problem = 'That picture is too big. Pick a smaller one.');
-      return;
-    }
-    setState(() => _problem = null);
-    widget.onChanged(widget.upload(bytes), bytes);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final picture = widget.picture;
-    final problem = _problem;
-    final noun = widget.noun;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 8,
-      children: [
-        Text(
-          noun[0].toUpperCase() + noun.substring(1),
-          style: TextStyle(color: DeckLook.of(context).muted, fontSize: 12),
-        ),
-        Row(
-          spacing: 10,
-          children: [
-            if (picture != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox.square(
-                  dimension: 48,
-                  child: Image.memory(
-                    picture,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-            OutlinedButton.icon(
-              onPressed: _choose,
-              icon: const Icon(Icons.image_rounded),
-              label: Text(widget.chosen ? 'Change $noun' : 'Choose $noun'),
-            ),
-            if (widget.chosen)
-              TextButton(
-                onPressed: () => widget.onChanged(null, null),
-                child: const Text('Remove'),
-              ),
-          ],
-        ),
-        if (problem != null)
-          Text(problem, style: TextStyle(color: deckColors['red'])),
-      ],
-    );
-  }
 }

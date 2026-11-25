@@ -8,7 +8,6 @@ void main() {
 
     expect(settings.theme, 'midnight');
     expect(settings.haptics, isTrue);
-    expect(settings.showMusic, isTrue);
     expect(settings.fullScreen, isFalse);
   });
 
@@ -19,7 +18,7 @@ void main() {
       theme: 'neon',
       corners: 'square',
       fullScreen: true,
-      bigPcCards: true,
+      haptics: false,
     );
 
     await store.save(changed);

@@ -77,13 +77,15 @@ the phone sends the pictures with `saveImage` and the result with `saveDeck`.
 | `keys` | 1 to 20 combos, run 50 ms apart. A combo is up to 6 keys joined by `+`: `Ctrl`, `Shift`, `Alt`, `Win`, `A` to `Z`, `0` to `9`, `F1` to `F24`, `Enter`, `Esc`, `Tab`, `Space`, `Backspace`, `Delete`, `Insert`, `Home`, `End`, `PageUp`, `PageDown`, `Up`, `Down`, `Left`, `Right`, `PrintScreen`. Keys are sent as scan codes, so games see them. |
 | `open` | `target` is up to 1000 characters: an app, file, folder or link, opened the way a double click would. |
 | `folder` | `buttons` is a list of up to 32 buttons that the phone shows when the folder is tapped, with a Back tile. A folder can't hold another folder, and button ids are unique across the whole deck, folders included. |
+| `music`, `clock` | Widgets: the song playing on the PC with its cover and controls, or the time with the PC's name, CPU temperature and FPS. Nothing else to set. |
+| `photos` | A photo frame: `pictures` is a list of up to 30 picture ids, shown in turn. |
 | `stat` | Shows a reading instead of doing something. `stat` is `cpuLoad`, `gpuLoad`, `gpuTemp`, `ramLoad`, `cpuTemp`, `fps`, or a telemetry name (`speed`, `rpm`, `gear`, `fuel`, `lap`, `position`, `lapTime`, `lastLap`, `bestLap`, `tyreFlTemp`, `tyreFrTemp`, `tyreRlTemp`, `tyreRrTemp`), and `style` is `number`, `gauge` or `chart`. Pressing it does nothing. |
 
 A deck has 1 to 20 pages, a page up to 32 buttons, and every page name and button label is 1 to 40
 characters. Button ids are unique across the deck, up to 64 characters. A button may have an `icon` (a name
 of up to 40 lowercase letters, digits and `_`, from the app's icon set) and a `color` (`red`, `amber`,
 `green`, `teal`, `blue`, `purple`, `pink` or `gray`). Without them the app picks both from what the button
-does. It may also have a `size` (`wide`, `tall` or `big`; left out it takes one place), a `style` (`solid`
+does. It may also have a `size` (`wide` 2×1, `tall` 1×2, `big` 2×2, `wider` 3×1 or `huge` 3×2; left out it takes one place), a `style` (`solid`
 or `outline`; left out it is tinted) a `show` (`icon` or `name`; left out it shows both), and an `image` (a picture id, shown instead of the icon). A page may
 have a `size` for its buttons (`small`, `medium`, `large` or `huge`), an `icon` for the page rail, and a
 `background` color, and a `wallpaper` (a picture id) behind its buttons.

@@ -185,6 +185,33 @@ void main() {
     expect(pictureId(Uint8List.fromList([1, 2, 3])), '039058c6f2c0cb49');
   });
 
+  test('music, clock and photo widgets read like on the PC', () {
+    // The same text as MusicClockAndPhotoWidgetsAreButtonsToo on the PC.
+    const json =
+        '{"pages":[{"name":"Home","buttons":['
+        '{"id":"m","label":"Music","action":{"kind":"music"},"size":"wider"},'
+        '{"id":"c","label":"Clock","action":{"kind":"clock"},"size":"huge"},'
+        '{"id":"p","label":"Photos","action":{"kind":"photos","pictures":["0123456789abcdef"]},"size":"big"}'
+        ']}]}';
+
+    final deck = Deck.fromJson(jsonDecode(json))!;
+
+    expect(jsonEncode(deck.toJson()), json);
+    expect(deck.pictureIds, {'0123456789abcdef'});
+  });
+
+  test('adds music and clock to the start of the first page, once', () {
+    final once = sample().withHomeWidgets();
+    final twice = once.withHomeWidgets();
+
+    expect(once.pages[0].buttons.take(2).map((b) => b.action.runtimeType), [
+      MusicAction,
+      ClockAction,
+    ]);
+    expect(once.pages[0].buttons.first.size, 'wider');
+    expect(twice.pages[0].buttons, hasLength(once.pages[0].buttons.length));
+  });
+
   test('new button ids are unique', () {
     expect({for (var i = 0; i < 100; i++) newButtonId()}, hasLength(100));
   });

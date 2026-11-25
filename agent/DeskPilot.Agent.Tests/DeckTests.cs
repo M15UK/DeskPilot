@@ -104,6 +104,7 @@ public class DeckTests
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"f","label":"Streaming","action":{"kind":"folder","buttons":[{"id":"f","label":"Same id","action":{"kind":"media","media":"next"}}]}}]}]}""")]
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},"image":"../x"}]}]}""")]
     [InlineData("""{"pages":[{"name":"Main","buttons":[],"wallpaper":"C:\\Windows"}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"p","label":"P","action":{"kind":"photos","pictures":["../../etc"]}}]}]}""")]
     [InlineData("""["not","a","deck"]""")]
     public void BadDecksAreRefused(string json)
     {
@@ -123,6 +124,23 @@ public class DeckTests
         Assert.Null(problem);
         Assert.Equal(json, Json(deck!));
         Assert.Equal(new OpenAction("obs64.exe"), deck!.Find("obs")!.Action);
+    }
+
+    [Fact]
+    public void MusicClockAndPhotoWidgetsAreButtonsToo()
+    {
+        const string json =
+            """{"pages":[{"name":"Home","buttons":[""" +
+            """{"id":"m","label":"Music","action":{"kind":"music"},"size":"wider"},""" +
+            """{"id":"c","label":"Clock","action":{"kind":"clock"},"size":"huge"},""" +
+            """{"id":"p","label":"Photos","action":{"kind":"photos","pictures":["0123456789abcdef"]},"size":"big"}""" +
+            """]}]}""";
+
+        var deck = Deck.Read(JsonDocument.Parse(json).RootElement, out var problem);
+
+        Assert.Null(problem);
+        Assert.Equal(json, Json(deck!));
+        Assert.IsType<MusicAction>(deck!.Find("m")!.Action);
     }
 
     [Fact]

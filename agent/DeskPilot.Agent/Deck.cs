@@ -12,6 +12,9 @@ namespace DeskPilot.Agent;
 [JsonDerivedType(typeof(OpenAction), "open")]
 [JsonDerivedType(typeof(StatAction), "stat")]
 [JsonDerivedType(typeof(FolderAction), "folder")]
+[JsonDerivedType(typeof(MusicAction), "music")]
+[JsonDerivedType(typeof(ClockAction), "clock")]
+[JsonDerivedType(typeof(PhotosAction), "photos")]
 public abstract record ButtonAction;
 
 /// <summary>A media key: playPause, next, previous, volumeUp, volumeDown or mute.</summary>
@@ -40,6 +43,18 @@ public sealed record StatAction(string Stat, string Style) : ButtonAction
 /// <summary>A button that opens more buttons on the phone, with a way back. Folders don't hold folders.</summary>
 public sealed record FolderAction(IReadOnlyList<DeckButton> Buttons) : ButtonAction;
 
+/// <summary>A tile with the song playing on the PC, its cover and controls.</summary>
+public sealed record MusicAction : ButtonAction;
+
+/// <summary>A tile with the time, which PC this is, and its CPU temperature and FPS.</summary>
+public sealed record ClockAction : ButtonAction;
+
+/// <summary>A tile that shows pictures from the <see cref="ImageStore"/> in turn, like a photo frame.</summary>
+public sealed record PhotosAction(IReadOnlyList<string> Pictures) : ButtonAction
+{
+    public const int MaxPictures = 30;
+}
+
 public sealed record DeckButton(
     string Id,
     string Label,
@@ -58,7 +73,8 @@ public sealed record DeckButton(
     public static readonly FrozenSet<string> Colors =
         new[] { "red", "amber", "green", "teal", "blue", "purple", "pink", "gray" }.ToFrozenSet();
 
-    public static readonly FrozenSet<string> Sizes = new[] { "wide", "tall", "big" }.ToFrozenSet();
+    /// <summary>Cells a button takes: wide 2×1, tall 1×2, big 2×2, wider 3×1, huge 3×2.</summary>
+    public static readonly FrozenSet<string> Sizes = new[] { "wide", "tall", "big", "wider", "huge" }.ToFrozenSet();
 }
 
 /// <summary>
@@ -100,6 +116,8 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
 
     public static Deck Default { get; } = new([new DeckPage("Main",
     [
+        new DeckButton("music", "Music", new MusicAction(), Size: "wider"),
+        new DeckButton("clock", "Clock", new ClockAction()),
         new DeckButton("previous", "Previous", new MediaAction("previous")),
         new DeckButton("play-pause", "Play / Pause", new MediaAction("playPause")),
         new DeckButton("next", "Next", new MediaAction("next")),
@@ -239,6 +257,9 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
         OpenAction open => !string.IsNullOrWhiteSpace(open.Target) && open.Target.Length <= MaxTargetLength,
         StatAction stat => (PcStats.Names.Contains(stat.Stat) || SimTelemetry.Names.Contains(stat.Stat))
             && StatAction.Styles.Contains(stat.Style),
+        MusicAction or ClockAction => true,
+        PhotosAction photos => photos.Pictures.Count <= PhotosAction.MaxPictures
+            && photos.Pictures.All(ImageStore.IsId),
         _ => false,
     };
 }

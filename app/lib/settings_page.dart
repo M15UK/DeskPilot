@@ -13,6 +13,8 @@ class SettingsPage extends StatefulWidget {
     required this.onForget,
     this.onBackup,
     this.onLoadBackup,
+    this.canVibrate = true,
+    this.onAddHomeWidgets,
   });
 
   final AppSettings settings;
@@ -27,6 +29,12 @@ class SettingsPage extends StatefulWidget {
 
   /// Loads a backup file; null while the PC isn't connected.
   final VoidCallback? onLoadBackup;
+
+  /// False on tablets without a vibration motor.
+  final bool canVibrate;
+
+  /// Puts music and clock tiles on the first page; null without a deck.
+  final VoidCallback? onAddHomeWidgets;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -140,40 +148,34 @@ class _SettingsPageState extends State<SettingsPage> {
           _Section('Presses'),
           _Switch(
             title: 'Vibrate',
-            subtitle: 'A small buzz each time you press a button.',
+            subtitle: widget.canVibrate
+                ? 'A small buzz each time you press a button.'
+                : "This tablet has no vibration motor, so it can't buzz.",
             value: s.haptics,
             onChanged: (on) => _change(s.copyWith(haptics: on)),
           ),
           _Switch(
             title: 'Click sound',
-            subtitle: 'Uses the tablet\'s own click, at its system volume.',
+            subtitle:
+                'A short click at media volume, even when touch sounds '
+                'are off.',
             value: s.clickSound,
             onChanged: (on) => _change(s.copyWith(clickSound: on)),
           ),
           _Section('Home screen'),
-          _Switch(
-            title: 'Music card',
-            subtitle: 'The song playing on the PC, with its cover.',
-            value: s.showMusic,
-            onChanged: (on) => _change(s.copyWith(showMusic: on)),
+          const Text(
+            'Music, the clock and photos are tiles now. In edit mode, tap Add '
+            'button and pick Widget, then drag them anywhere and pick their '
+            'shape.',
           ),
-          _Switch(
-            title: 'Clock and PC card',
-            value: s.showClock,
-            onChanged: (on) => _change(s.copyWith(showClock: on)),
-          ),
-          _Switch(
-            title: 'Big PC cards',
-            subtitle: 'CPU, GPU, RAM and FPS as large rings.',
-            value: s.bigPcCards,
-            onChanged: (on) => _change(s.copyWith(bigPcCards: on)),
-          ),
-          _Switch(
-            title: 'Show them on every page',
-            subtitle: 'Otherwise they only show on the first page.',
-            value: s.cardsOnEveryPage,
-            onChanged: (on) => _change(s.copyWith(cardsOnEveryPage: on)),
-          ),
+          if (widget.onAddHomeWidgets case final add?) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: add,
+              icon: const Icon(Icons.dashboard_customize_rounded),
+              label: const Text('Add music and clock to the first page'),
+            ),
+          ],
           _Section('Backup and share'),
           if (widget.onBackup == null && widget.onLoadBackup == null)
             const Text('Connect to your PC to back up or load a deck.')

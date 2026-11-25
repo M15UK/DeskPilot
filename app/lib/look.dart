@@ -15,7 +15,7 @@ class DeckLook extends ThemeExtension<DeckLook> {
     required this.text,
     required this.muted,
     required this.accent,
-    this.radius = 16,
+    this.radius = 28,
     this.gap = 10,
   });
 
@@ -100,7 +100,8 @@ const deckLooks = {
 const deckSpacings = {'tight': 6.0, 'normal': 10.0, 'roomy': 16.0};
 
 /// How round corners are, by the name settings save.
-const deckCorners = {'square': 4.0, 'soft': 10.0, 'round': 16.0};
+// Far apart on purpose, so each choice looks clearly different on a tablet.
+const deckCorners = {'square': 2.0, 'soft': 12.0, 'round': 28.0};
 
 /// The colors a button can have. The PC accepts the same names.
 const deckColors = {
@@ -183,6 +184,9 @@ IconData _autoIcon(ButtonAction action) => switch (action) {
   MediaAction() => Icons.music_note_rounded,
   KeysAction() => Icons.keyboard_rounded,
   FolderAction() => Icons.folder_rounded,
+  MusicAction() => Icons.music_note_rounded,
+  ClockAction() => Icons.schedule_rounded,
+  PhotosAction() => Icons.photo_library_rounded,
   OpenAction(:final target) when target.contains('://') =>
     Icons.language_rounded,
   OpenAction() => Icons.open_in_new_rounded,
@@ -199,6 +203,9 @@ Color _autoColor(ButtonAction action) => switch (action) {
   MediaAction() => deckColors['teal']!,
   KeysAction() => deckColors['blue']!,
   FolderAction() => deckColors['amber']!,
+  MusicAction() => deckColors['pink']!,
+  ClockAction() => deckColors['blue']!,
+  PhotosAction() => deckColors['purple']!,
   OpenAction() => deckColors['purple']!,
   StatAction(:final stat) => statColor(stat),
 };

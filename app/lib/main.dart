@@ -5,6 +5,7 @@ import 'package:deskpilot/agent_connection.dart';
 import 'package:deskpilot/backup.dart';
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/deck_view.dart';
+import 'package:deskpilot/feedback.dart';
 import 'package:deskpilot/look.dart';
 import 'package:deskpilot/now_playing.dart';
 import 'package:deskpilot/pairing.dart';
@@ -103,6 +104,7 @@ class _DeckPageState extends State<DeckPage> {
   int _page = 0;
   bool _editing = false;
   bool _loading = true;
+  bool _canVibrate = true;
   bool _busy = false;
   String _status = '';
   // Counts connection attempts, so a slow one that ends after Forget is
@@ -113,6 +115,12 @@ class _DeckPageState extends State<DeckPage> {
   void initState() {
     super.initState();
     unawaited(_loadSavedPc());
+    unawaited(_checkVibration());
+  }
+
+  Future<void> _checkVibration() async {
+    final can = await canVibrate();
+    if (mounted) setState(() => _canVibrate = can);
   }
 
   Future<void> _loadSavedPc() async {
@@ -385,10 +393,8 @@ class _DeckPageState extends State<DeckPage> {
 
   /// The vibration and click a press gives, as settings say.
   void _feedback() {
-    if (widget.settings.haptics) unawaited(HapticFeedback.lightImpact());
-    if (widget.settings.clickSound) {
-      unawaited(SystemSound.play(SystemSoundType.click));
-    }
+    if (widget.settings.haptics) unawaited(vibrate());
+    if (widget.settings.clickSound) unawaited(playClick());
   }
 
   void _press(String id) {
@@ -410,6 +416,11 @@ class _DeckPageState extends State<DeckPage> {
         onForget: () => unawaited(_forget()),
         onBackup: _deck == null ? null : () => unawaited(_backupDeck()),
         onLoadBackup: _agent == null ? null : () => unawaited(_loadBackup()),
+        canVibrate: _canVibrate,
+        onAddHomeWidgets: switch (_deck) {
+          final deck? => () => _save(deck.withHomeWidgets()),
+          null => null,
+        },
       ),
     ),
   );
@@ -521,7 +532,9 @@ class _DeckPageState extends State<DeckPage> {
                   onFolderChanged: (id) => setState(() => _folder = id),
                   stats: {..._stats, ..._telemetry},
                   history: _history,
-                  header: _homeCards(page, media, agent),
+                  media: media,
+                  onMediaKey: agent == null ? null : _mediaKey,
+                  pcName: agent?.pcName,
                   tools: _barHidden(context)
                       ? [
                           (
@@ -541,184 +554,6 @@ class _DeckPageState extends State<DeckPage> {
                 ),
         ),
       ],
-    );
-  }
-}
-
-/// The home screen cards above the buttons: the song and the PC, and the big
-/// PC rings, as settings say. Null when there are none on this page.
-extension on _DeckPageState {
-  Widget? _homeCards(int page, NowPlaying? media, AgentConnection? agent) {
-    final settings = widget.settings;
-    if (_editing ||
-        _folder != null ||
-        (page != 0 && !settings.cardsOnEveryPage)) {
-      return null;
-    }
-    final top = [
-      if (settings.showMusic && media != null)
-        Expanded(
-          child: NowPlayingCard(
-            media: media,
-            onKey: agent == null ? null : _mediaKey,
-          ),
-        ),
-      if (settings.showClock) _PcCard(name: agent?.pcName, stats: _stats),
-    ];
-    final rows = [
-      if (top.isNotEmpty)
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 10,
-            children: top,
-          ),
-        ),
-      if (settings.bigPcCards)
-        SizedBox(
-          height: 150,
-          child: Row(
-            spacing: 10,
-            children: [
-              for (final (stat, label) in [
-                ('cpuLoad', 'CPU'),
-                ('gpuLoad', 'GPU'),
-                ('ramLoad', 'RAM'),
-                ('fps', 'FPS'),
-              ])
-                Expanded(
-                  child: StatTile(
-                    label: label,
-                    action: StatAction(stat, 'gauge'),
-                    value: _stats[stat],
-                    maximum: statMaximum(stat),
-                    history: const [],
-                    color: statColor(stat),
-                  ),
-                ),
-            ],
-          ),
-        ),
-    ];
-    if (rows.isEmpty) return null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 10,
-      children: rows,
-    );
-  }
-}
-
-/// The clock, which PC this is, and its CPU temperature and FPS, beside the
-/// music card.
-class _PcCard extends StatelessWidget {
-  const _PcCard({required this.name, required this.stats});
-
-  /// Null while the PC isn't connected.
-  final String? name;
-  final Map<String, double> stats;
-
-  static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  static const _months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    // 10:28 PM or 22:28, as the phone is set.
-    final time = MaterialLocalizations.of(context).formatTimeOfDay(
-      TimeOfDay.fromDateTime(now),
-      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
-    );
-    final (cpuTemp, fps) = (stats['cpuTemp'], stats['fps']);
-    final pc = name;
-    return Card(
-      child: SizedBox(
-        width: 170,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                time,
-                style: TextStyle(
-                  color: DeckLook.of(context).text,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Text(
-                '${_days[now.weekday - 1]} ${now.day} ${_months[now.month - 1]}',
-                style: TextStyle(
-                  color: DeckLook.of(context).muted,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                spacing: 6,
-                children: [
-                  Icon(
-                    Icons.circle,
-                    size: 8,
-                    color: pc == null
-                        ? DeckLook.of(context).muted
-                        : deckColors['green'],
-                  ),
-                  Expanded(
-                    child: Text(
-                      pc ?? 'Not connected',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: DeckLook.of(context).text,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (cpuTemp != null || fps != null)
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      if (cpuTemp != null)
-                        TextSpan(
-                          text: formatStat('cpuTemp', cpuTemp),
-                          style: TextStyle(color: deckColors['amber']),
-                        ),
-                      if (cpuTemp != null && fps != null)
-                        const TextSpan(text: '  ·  '),
-                      if (fps != null)
-                        TextSpan(
-                          text: '${formatStat('fps', fps)} fps',
-                          style: TextStyle(color: deckColors['green']),
-                        ),
-                    ],
-                  ),
-                  style: TextStyle(
-                    color: DeckLook.of(context).muted,
-                    fontSize: 12,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

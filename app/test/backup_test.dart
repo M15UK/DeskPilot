@@ -66,9 +66,9 @@ void main() {
   });
 
   test('leaves out a picture that does not match its id', () {
-    final json =
-        jsonDecode(writeBackup(deck: deck, pictures: {id: png}))
-            as Map<String, Object?>;
+    final json = jsonDecode(
+      writeBackup(deck: deck, pictures: {id: png}),
+    ) as Map<String, Object?>;
     (json['pictures']! as Map<String, Object?>)[id] = base64Encode([1, 2, 3]);
 
     expect(readBackup(jsonEncode(json))!.pictures, isEmpty);

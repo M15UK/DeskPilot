@@ -58,6 +58,11 @@ sealed class ButtonAction {
     {'kind': 'stat', 'stat': final String stat, 'style': final String style}
         when statNames.containsKey(stat) && statStyles.containsKey(style) =>
       StatAction(stat, style),
+    {'kind': 'music'} => const MusicAction(),
+    {'kind': 'clock'} => const ClockAction(),
+    {'kind': 'photos', 'pictures': final List<Object?> pictures}
+        when pictures.every((id) => id is String) =>
+      PhotosAction(List.unmodifiable(pictures.cast<String>())),
     {'kind': 'folder', 'buttons': final List<Object?> buttons} =>
       switch (_readAll(buttons, DeckButton.fromJson)) {
         final List<DeckButton> read
@@ -101,6 +106,32 @@ final class OpenAction extends ButtonAction {
 
 /// A tile that shows a PC reading, one of [statNames], in one of
 /// [statStyles]. Tapping it does nothing.
+/// A tile with the song playing on the PC, its cover and controls.
+final class MusicAction extends ButtonAction {
+  const MusicAction();
+
+  @override
+  Map<String, Object> toJson() => {'kind': 'music'};
+}
+
+/// A tile with the time, which PC this is, and its CPU temperature and FPS.
+final class ClockAction extends ButtonAction {
+  const ClockAction();
+
+  @override
+  Map<String, Object> toJson() => {'kind': 'clock'};
+}
+
+/// A tile that shows [pictures] in turn, like a photo frame.
+final class PhotosAction extends ButtonAction {
+  const PhotosAction(this.pictures);
+
+  final List<String> pictures;
+
+  @override
+  Map<String, Object> toJson() => {'kind': 'photos', 'pictures': pictures};
+}
+
 /// A button that opens more buttons on the phone, with a way back. Folders
 /// don't hold folders.
 final class FolderAction extends ButtonAction {
@@ -278,6 +309,8 @@ const buttonSizes = {
   'wide': 'Wide',
   'tall': 'Tall',
   'big': 'Big',
+  'wider': 'Wider',
+  'huge': 'Huge',
 };
 
 /// Button styles: a soft tint, a solid color, or only an outline.
@@ -400,6 +433,32 @@ class Deck {
     ),
   );
 
+  /// Puts a wide music tile and a clock at the start of the first page,
+  /// unless the deck has them already.
+  Deck withHomeWidgets() {
+    bool has<T extends ButtonAction>() =>
+        pages.any((page) => page.buttons.any((button) => button.action is T));
+    return _editPage(
+      0,
+      (page) => page._withButtons([
+        if (!has<MusicAction>())
+          DeckButton(
+            id: newButtonId(),
+            label: 'Music',
+            action: const MusicAction(),
+            size: 'wider',
+          ),
+        if (!has<ClockAction>())
+          DeckButton(
+            id: newButtonId(),
+            label: 'Clock',
+            action: const ClockAction(),
+          ),
+        ...page.buttons,
+      ]),
+    );
+  }
+
   /// Adds a page from a backup at the end, with new button ids, so they can't
   /// clash with this deck's.
   Deck withImportedPage(DeckPage page) {
@@ -425,9 +484,9 @@ class Deck {
     for (final page in pages) ...[
       ?page.wallpaper,
       for (final button in page.buttons) ...[
-        ?button.image,
+        ..._pictures(button),
         if (button.action case FolderAction(:final buttons))
-          for (final inside in buttons) ?inside.image,
+          for (final inside in buttons) ..._pictures(inside),
       ],
     ],
   };
@@ -474,6 +533,12 @@ List<T>? _readAll<T>(List<Object?> items, T? Function(Object?) read) {
 
 final _random = Random.secure();
 
+/// The pictures one button shows: its own, or a photo tile's.
+Iterable<String> _pictures(DeckButton button) => [
+  ?button.image,
+  if (button.action case PhotosAction(:final pictures)) ...pictures,
+];
+
 /// A picture's id: the start of its SHA-256, the same as the PC names it.
 String pictureId(Uint8List bytes) =>
     sha256.convert(bytes).toString().substring(0, 16);
@@ -492,6 +557,9 @@ String autoLabel(ButtonAction action) {
     KeysAction(:final combos) => combos.join(', '),
     OpenAction(:final target) => _openName(target),
     FolderAction() => 'Folder',
+    MusicAction() => 'Music',
+    ClockAction() => 'Clock',
+    PhotosAction() => 'Photos',
     StatAction(:final stat) => _capitalized(
       (statNames[stat] ?? stat).replaceFirst('Sim: ', ''),
     ),

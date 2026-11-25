@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/editor.dart';
 import 'package:deskpilot/look.dart';
+import 'package:deskpilot/now_playing.dart';
 import 'package:deskpilot/pictures.dart';
 import 'package:deskpilot/tile_grid.dart';
 import 'package:deskpilot/tiles.dart';
@@ -19,7 +20,13 @@ typedef RailTool = ({IconData icon, String label, VoidCallback onTap});
 const _cellSizes = {'small': 120.0, null: 170.0, 'large': 230.0, 'huge': 300.0};
 
 /// How many cells (wide, tall) each button shape takes.
-const _spans = {'wide': (2, 1), 'tall': (1, 2), 'big': (2, 2)};
+const _spans = {
+  'wide': (2, 1),
+  'tall': (1, 2),
+  'big': (2, 2),
+  'wider': (3, 1),
+  'huge': (3, 2),
+};
 
 /// Wider than this, pages sit in a rail on the left (tablets); narrower, they
 /// are chips under the grid (phones).
@@ -39,7 +46,9 @@ class DeckView extends StatelessWidget {
     required this.onPageChanged,
     this.stats = const {},
     this.history = const {},
-    this.header,
+    this.media,
+    this.onMediaKey,
+    this.pcName,
     this.tools = const [],
     this.folder,
     this.onFolderChanged,
@@ -64,8 +73,14 @@ class DeckView extends StatelessWidget {
   /// The last minute of each reading, oldest first, for chart tiles.
   final Map<String, List<double>> history;
 
-  /// Shown above the buttons and beside the page rail, like the music card.
-  final Widget? header;
+  /// What the PC is playing, for music tiles.
+  final NowPlaying? media;
+
+  /// Presses a media key for a music tile's buttons; null turns them off.
+  final ValueChanged<String>? onMediaKey;
+
+  /// The PC's name for clock tiles; null while it isn't connected.
+  final String? pcName;
 
   /// Extra buttons at the end of the page rail, like settings while full
   /// screen hides the top bar.
@@ -117,31 +132,19 @@ class DeckView extends StatelessWidget {
                   ),
               ],
             ),
-            Expanded(child: _withHeader(_grid(context))),
+            Expanded(child: _grid(context)),
           ],
         );
       }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: _withHeader(_grid(context))),
+          Expanded(child: _grid(context)),
           if (deck.pages.length > 1 || editing) _pageChips(context),
         ],
       );
     },
   );
-
-  Widget _withHeader(Widget grid) => switch (header) {
-    final Widget header => Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 10,
-      children: [
-        header,
-        Expanded(child: grid),
-      ],
-    ),
-    null => grid,
-  };
 
   Widget _grid(BuildContext context) {
     final shown = deck.pages[page];
@@ -284,6 +287,31 @@ class DeckView extends StatelessWidget {
 
   Widget _tile(BuildContext context, DeckButton button) {
     final edit = editing ? () => _editButton(context, button) : null;
+    final shows = switch (button.action) {
+      MusicAction() => NowPlayingCard(
+        media: media,
+        onKey: editing ? null : onMediaKey,
+      ),
+      ClockAction() => ClockTile(pcName: pcName, stats: stats),
+      PhotosAction(pictures: final ids) => PhotosTile(
+        pictures: [for (final id in ids) ?pictures[id]],
+      ),
+      _ => null,
+    };
+    if (shows != null) {
+      if (edit == null) return shows;
+      // In edit mode a tap anywhere on a widget edits it.
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          shows,
+          Material(
+            type: MaterialType.transparency,
+            child: InkWell(onTap: edit),
+          ),
+        ],
+      );
+    }
     if (button.action case final StatAction stat) {
       return StatTile(
         label: button.label,
@@ -527,7 +555,9 @@ class _RailItem extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: selected ? const Color(0xFF1E2433) : null,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(
+                  DeckLook.of(context).radius * 0.6,
+                ),
               ),
               child: Icon(
                 icon,

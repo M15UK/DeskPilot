@@ -15,10 +15,6 @@ class AppSettings {
     this.keepScreenOn = false,
     this.haptics = true,
     this.clickSound = false,
-    this.showMusic = true,
-    this.showClock = true,
-    this.cardsOnEveryPage = false,
-    this.bigPcCards = false,
   });
 
   /// One of [deckLooks].
@@ -33,10 +29,6 @@ class AppSettings {
   final bool keepScreenOn;
   final bool haptics;
   final bool clickSound;
-  final bool showMusic;
-  final bool showClock;
-  final bool cardsOnEveryPage;
-  final bool bigPcCards;
 
   AppSettings copyWith({
     String? theme,
@@ -46,10 +38,6 @@ class AppSettings {
     bool? keepScreenOn,
     bool? haptics,
     bool? clickSound,
-    bool? showMusic,
-    bool? showClock,
-    bool? cardsOnEveryPage,
-    bool? bigPcCards,
   }) => AppSettings(
     theme: theme ?? this.theme,
     spacing: spacing ?? this.spacing,
@@ -58,10 +46,6 @@ class AppSettings {
     keepScreenOn: keepScreenOn ?? this.keepScreenOn,
     haptics: haptics ?? this.haptics,
     clickSound: clickSound ?? this.clickSound,
-    showMusic: showMusic ?? this.showMusic,
-    showClock: showClock ?? this.showClock,
-    cardsOnEveryPage: cardsOnEveryPage ?? this.cardsOnEveryPage,
-    bigPcCards: bigPcCards ?? this.bigPcCards,
   );
 
   Map<String, Object> toJson() => {
@@ -72,10 +56,6 @@ class AppSettings {
     'keepScreenOn': keepScreenOn,
     'haptics': haptics,
     'clickSound': clickSound,
-    'showMusic': showMusic,
-    'showClock': showClock,
-    'cardsOnEveryPage': cardsOnEveryPage,
-    'bigPcCards': bigPcCards,
   };
 
   /// Reads saved settings, using the usual value for anything missing or
@@ -100,10 +80,6 @@ class AppSettings {
       keepScreenOn: flag('keepScreenOn', usual.keepScreenOn),
       haptics: flag('haptics', usual.haptics),
       clickSound: flag('clickSound', usual.clickSound),
-      showMusic: flag('showMusic', usual.showMusic),
-      showClock: flag('showClock', usual.showClock),
-      cardsOnEveryPage: flag('cardsOnEveryPage', usual.cardsOnEveryPage),
-      bigPcCards: flag('bigPcCards', usual.bigPcCards),
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -340,4 +341,196 @@ class _ChartPainter extends CustomPainter {
   @override
   bool shouldRepaint(_ChartPainter old) =>
       old.points != points || old.maximum != maximum || old.color != color;
+}
+
+/// The time, which PC this is, and its CPU temperature and FPS. The time
+/// grows with the tile.
+class ClockTile extends StatelessWidget {
+  const ClockTile({super.key, required this.pcName, required this.stats});
+
+  /// Null while the PC isn't connected.
+  final String? pcName;
+  final Map<String, double> stats;
+
+  static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const _months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final look = DeckLook.of(context);
+    final now = DateTime.now();
+    // 10:28 PM or 22:28, as the phone is set.
+    final time = MaterialLocalizations.of(context).formatTimeOfDay(
+      TimeOfDay.fromDateTime(now),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+    );
+    final (cpuTemp, fps) = (stats['cpuTemp'], stats['fps']);
+    final pc = pcName;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  time,
+                  style: TextStyle(
+                    color: look.text,
+                    fontSize: 64,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            Text(
+              '${_days[now.weekday - 1]} ${now.day} ${_months[now.month - 1]}',
+              style: TextStyle(color: look.muted, fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              spacing: 6,
+              children: [
+                Icon(
+                  Icons.circle,
+                  size: 8,
+                  color: pc == null ? look.muted : deckColors['green'],
+                ),
+                Expanded(
+                  child: Text(
+                    pc ?? 'Not connected',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: look.text, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+            if (cpuTemp != null || fps != null)
+              Text.rich(
+                TextSpan(
+                  children: [
+                    if (cpuTemp != null)
+                      TextSpan(
+                        text: formatStat('cpuTemp', cpuTemp),
+                        style: TextStyle(color: deckColors['amber']),
+                      ),
+                    if (cpuTemp != null && fps != null)
+                      const TextSpan(text: '  ·  '),
+                    if (fps != null)
+                      TextSpan(
+                        text: '${formatStat('fps', fps)} fps',
+                        style: TextStyle(color: deckColors['green']),
+                      ),
+                  ],
+                ),
+                style: TextStyle(color: look.muted, fontSize: 12),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A photo frame: shows [pictures] in turn, a new one every few seconds or
+/// on a tap.
+class PhotosTile extends StatefulWidget {
+  const PhotosTile({super.key, required this.pictures});
+
+  final List<Uint8List> pictures;
+
+  @override
+  State<PhotosTile> createState() => _PhotosTileState();
+}
+
+class _PhotosTileState extends State<PhotosTile> {
+  static const _every = Duration(seconds: 8);
+  Timer? _timer;
+  int _shown = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _restart();
+  }
+
+  @override
+  void didUpdateWidget(PhotosTile old) {
+    super.didUpdateWidget(old);
+    if (old.pictures.length != widget.pictures.length) _restart();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  /// Only a frame with two or more photos needs to change them.
+  void _restart() {
+    _timer?.cancel();
+    _timer = widget.pictures.length < 2
+        ? null
+        : Timer.periodic(_every, (_) => _next());
+  }
+
+  void _next() {
+    if (widget.pictures.isNotEmpty) setState(() => _shown++);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final look = DeckLook.of(context);
+    final pictures = widget.pictures;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: pictures.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 6,
+                children: [
+                  Icon(Icons.photo_library_rounded, color: look.muted),
+                  Text(
+                    'Add photos in edit mode',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: look.muted, fontSize: 12),
+                  ),
+                ],
+              ),
+            )
+          : GestureDetector(
+              onTap: _next,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 600),
+                child: Image.memory(
+                  pictures[_shown % pictures.length],
+                  key: ValueKey(_shown % pictures.length),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+    );
+  }
 }
