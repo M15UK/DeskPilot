@@ -268,6 +268,92 @@ void main() {
     expect(main.buttons, hasLength(1));
   });
 
+  group('folders', () {
+    const withFolder = Deck([
+      DeckPage(
+        name: 'Main',
+        buttons: [
+          DeckButton(
+            id: 'f',
+            label: 'Streaming',
+            action: FolderAction([
+              DeckButton(
+                id: 'rec',
+                label: 'Record',
+                action: KeysAction(['Ctrl+F9']),
+              ),
+            ]),
+          ),
+        ],
+      ),
+    ]);
+
+    Widget folderHost({bool editing = false, String? open}) => MaterialApp(
+      home: Scaffold(
+        body: StatefulBuilder(
+          builder: (context, setState) => DeckView(
+            deck: withFolder,
+            page: 0,
+            editing: editing,
+            onPress: (id) => pressed = id,
+            onChange: (deck) => changed = deck,
+            onPageChanged: _ignore,
+            folder: open,
+            onFolderChanged: (id) => setState(() => open = id),
+          ),
+        ),
+      ),
+    );
+
+    testWidgets('open on a tap, press what is inside, and close with Back', (
+      tester,
+    ) async {
+      await tester.pumpWidget(folderHost());
+
+      await tester.tap(find.text('Streaming'));
+      await tester.pump();
+      await tester.tap(find.text('Record'));
+      expect(pressed, 'rec');
+      await tester.tap(find.text('Back'));
+      await tester.pump();
+
+      expect(find.text('Streaming'), findsOneWidget);
+      expect(find.text('Record'), findsNothing);
+    });
+
+    testWidgets('get new buttons added inside them in edit mode', (
+      tester,
+    ) async {
+      await tester.pumpWidget(folderHost(editing: true, open: 'f'));
+
+      await tester.tap(find.text('Add button'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Folder'),
+        findsNothing,
+        reason: 'no folder in a folder',
+      );
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final folder = changed!.pages[0].buttons.single.action as FolderAction;
+      expect(folder.buttons, hasLength(2));
+    });
+
+    testWidgets('can be made from the editor', (tester) async {
+      await tester.pumpWidget(host(editing: true));
+
+      await tester.tap(find.text('Add button'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Folder'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(changed!.pages[0].buttons.last.action, isA<FolderAction>());
+    });
+  });
+
   testWidgets('adds a page in edit mode', (tester) async {
     await tester.pumpWidget(host(editing: true));
 

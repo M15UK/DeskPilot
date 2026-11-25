@@ -55,6 +55,13 @@ sealed class ButtonAction {
     {'kind': 'stat', 'stat': final String stat, 'style': final String style}
         when statNames.containsKey(stat) && statStyles.containsKey(style) =>
       StatAction(stat, style),
+    {'kind': 'folder', 'buttons': final List<Object?> buttons} =>
+      switch (_readAll(buttons, DeckButton.fromJson)) {
+        final List<DeckButton> read
+            when read.every((button) => button.action is! FolderAction) =>
+          FolderAction(read),
+        _ => null,
+      },
     _ => null,
   };
 }
@@ -91,6 +98,20 @@ final class OpenAction extends ButtonAction {
 
 /// A tile that shows a PC reading, one of [statNames], in one of
 /// [statStyles]. Tapping it does nothing.
+/// A button that opens more buttons on the phone, with a way back. Folders
+/// don't hold folders.
+final class FolderAction extends ButtonAction {
+  const FolderAction(this.buttons);
+
+  final List<DeckButton> buttons;
+
+  @override
+  Map<String, Object> toJson() => {
+    'kind': 'folder',
+    'buttons': [for (final button in buttons) button.toJson()],
+  };
+}
+
 final class StatAction extends ButtonAction {
   const StatAction(this.stat, this.style);
 
@@ -140,6 +161,17 @@ class DeckButton {
     'style': ?style,
     'show': ?show,
   };
+
+  DeckButton _withAction(ButtonAction action) => DeckButton(
+    id: id,
+    label: label,
+    action: action,
+    icon: icon,
+    color: color,
+    size: size,
+    style: style,
+    show: show,
+  );
 
   static DeckButton? fromJson(Object? json) {
     if (json
@@ -269,34 +301,60 @@ class Deck {
     return null;
   }
 
-  /// Puts [button] in place of the button with the same id, or at the end of
-  /// page [page] when it is new.
-  Deck withButton(int page, DeckButton button) {
-    final exists = pages.any((p) => p.buttons.any((b) => b.id == button.id));
-    if (exists) {
-      return _editPages(
-        (p) => p._withButtons([
-          for (final b in p.buttons) b.id == button.id ? button : b,
-        ]),
-      );
+  /// The button with [id], on a page or inside a folder.
+  DeckButton? find(String id) {
+    for (final page in pages) {
+      for (final button in page.buttons) {
+        if (button.id == id) return button;
+        if (button.action case FolderAction(:final buttons)) {
+          for (final inside in buttons) {
+            if (inside.id == id) return inside;
+          }
+        }
+      }
     }
-    return _editPage(page, (p) => p._withButtons([...p.buttons, button]));
+    return null;
   }
 
-  Deck withoutButton(String id) => _editPages(
-    (p) => p._withButtons([
-      for (final b in p.buttons)
-        if (b.id != id) b,
-    ]),
+  /// Puts [button] in place of the button with the same id, on a page or in a
+  /// folder, or at the end of page [page] when it is new.
+  Deck withButton(int page, DeckButton button) {
+    if (find(button.id) == null) {
+      return _editPage(page, (p) => p._withButtons([...p.buttons, button]));
+    }
+    return _editLists(
+      (list) => [for (final b in list) b.id == button.id ? button : b],
+    );
+  }
+
+  /// Adds a new [button] at the end of the folder with the id [folder].
+  Deck withButtonInFolder(String folder, DeckButton button) => _editLists(
+    (list) => [
+      for (final b in list)
+        if (b.action case FolderAction(:final buttons) when b.id == folder)
+          b._withAction(FolderAction(List.unmodifiable([...buttons, button])))
+        else
+          b,
+    ],
   );
 
-  /// Moves a button [by] places within its page, stopping at either end.
-  Deck movedButton(String id, int by) => _editPages((p) {
-    final from = p.buttons.indexWhere((b) => b.id == id);
-    if (from < 0) return p;
-    final to = (from + by).clamp(0, p.buttons.length - 1);
-    final others = [...p.buttons]..removeAt(from);
-    return p._withButtons([...others]..insert(to, p.buttons[from]));
+  /// Deletes a button, on a page or in a folder.
+  Deck withoutButton(String id) => _editLists(
+    (list) => [
+      for (final b in list)
+        if (b.id != id) b,
+    ],
+  );
+
+  /// Moves a button [by] places within its page or folder, stopping at either
+  /// end.
+  Deck movedButton(String id, int by) => _editLists((list) {
+    final from = list.indexWhere((b) => b.id == id);
+    if (from < 0) return list;
+    final to = (from + by).clamp(0, list.length - 1);
+    return [...list]
+      ..removeAt(from)
+      ..insert(to, list[from]);
   });
 
   Deck withPage(String name) => Deck(
@@ -336,6 +394,18 @@ class Deck {
 
   Deck _editPages(DeckPage Function(DeckPage) edit) =>
       Deck(List.unmodifiable([for (final p in pages) edit(p)]));
+
+  /// Applies [edit] to every page's buttons and every folder's buttons.
+  Deck _editLists(List<DeckButton> Function(List<DeckButton>) edit) =>
+      _editPages(
+        (p) => p._withButtons([
+          for (final b in edit(p.buttons))
+            if (b.action case FolderAction(:final buttons))
+              b._withAction(FolderAction(List.unmodifiable(edit(buttons))))
+            else
+              b,
+        ]),
+      );
 }
 
 /// Reads every item, or returns null when any of them can't be read.
@@ -364,6 +434,7 @@ String autoLabel(ButtonAction action) {
     MediaAction(:final media) => mediaKeys[media] ?? media,
     KeysAction(:final combos) => combos.join(', '),
     OpenAction(:final target) => _openName(target),
+    FolderAction() => 'Folder',
     StatAction(:final stat) => _capitalized(
       (statNames[stat] ?? stat).replaceFirst('Sim: ', ''),
     ),

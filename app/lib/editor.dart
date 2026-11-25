@@ -26,6 +26,13 @@ final class DeleteButton extends ButtonEdit {
   final String id;
 }
 
+/// Open the folder [id] to change the buttons inside it.
+final class OpenFolder extends ButtonEdit {
+  const OpenFolder(this.id);
+
+  final String id;
+}
+
 final class MoveButton extends ButtonEdit {
   const MoveButton(this.id, this.by);
 
@@ -35,9 +42,12 @@ final class MoveButton extends ButtonEdit {
 
 /// Adds a new button, or changes, moves or deletes [button].
 class ButtonEditor extends StatefulWidget {
-  const ButtonEditor({super.key, this.button});
+  const ButtonEditor({super.key, this.button, this.canBeFolder = true});
 
   final DeckButton? button;
+
+  /// False inside a folder: folders don't hold folders.
+  final bool canBeFolder;
 
   @override
   State<ButtonEditor> createState() => _ButtonEditorState();
@@ -62,6 +72,7 @@ class _ButtonEditorState extends State<ButtonEditor> {
     KeysAction() => 'keys',
     OpenAction() => 'open',
     StatAction() => 'stat',
+    FolderAction() => 'folder',
     _ => 'media',
   };
   late String _stat = switch (widget.button?.action) {
@@ -102,7 +113,18 @@ class _ButtonEditorState extends State<ButtonEditor> {
     ),
     'open' => OpenAction(_target.text.trim()),
     'stat' => StatAction(_stat, _style),
+    'folder' => FolderAction(switch (widget.button?.action) {
+      FolderAction(:final buttons) => buttons,
+      _ => const [],
+    }),
     _ => MediaAction(_media),
+  };
+
+  /// How many buttons the folder being edited holds, or null when it isn't
+  /// a folder.
+  int? get _folderButtons => switch (widget.button?.action) {
+    FolderAction(:final buttons) => buttons.length,
+    _ => null,
   };
 
   DeckButton _button(String id) {
@@ -217,18 +239,35 @@ class _ButtonEditorState extends State<ButtonEditor> {
                 ),
                 maxLength: _maxTextLength,
               ),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'media', label: Text('Media')),
-                  ButtonSegment(value: 'keys', label: Text('Keys')),
-                  ButtonSegment(value: 'open', label: Text('Open')),
-                  ButtonSegment(value: 'stat', label: Text('Stat')),
-                ],
-                selected: {_kind},
-                onSelectionChanged: (kinds) =>
-                    setState(() => _kind = kinds.single),
-              ),
+              // A folder with buttons in it stays a folder, so they can't be
+              // lost by picking another kind by mistake.
+              if (_folderButtons case final count? when count > 0)
+                Text(
+                  'This folder holds $count buttons. Open it to change them, '
+                  'or delete it to remove them all.',
+                )
+              else
+                SegmentedButton<String>(
+                  segments: [
+                    const ButtonSegment(value: 'media', label: Text('Media')),
+                    const ButtonSegment(value: 'keys', label: Text('Keys')),
+                    const ButtonSegment(value: 'open', label: Text('Open')),
+                    const ButtonSegment(value: 'stat', label: Text('Stat')),
+                    if (widget.canBeFolder)
+                      const ButtonSegment(
+                        value: 'folder',
+                        label: Text('Folder'),
+                      ),
+                  ],
+                  selected: {_kind},
+                  onSelectionChanged: (kinds) =>
+                      setState(() => _kind = kinds.single),
+                ),
               switch (_kind) {
+                'folder' => const Text(
+                  'Tap the folder on your deck to open it. To add buttons, '
+                  'open it from here in edit mode.',
+                ),
                 'keys' => TextFormField(
                   controller: _combos,
                   onChanged: (_) => setState(() {}),
@@ -318,6 +357,11 @@ class _ButtonEditorState extends State<ButtonEditor> {
         ),
       ),
       actions: [
+        if (button != null && button.action is FolderAction)
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(OpenFolder(button.id)),
+            child: const Text('Open folder'),
+          ),
         if (button != null) ...[
           IconButton(
             tooltip: 'Move left',

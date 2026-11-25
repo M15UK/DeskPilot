@@ -11,6 +11,7 @@ namespace DeskPilot.Agent;
 [JsonDerivedType(typeof(KeysAction), "keys")]
 [JsonDerivedType(typeof(OpenAction), "open")]
 [JsonDerivedType(typeof(StatAction), "stat")]
+[JsonDerivedType(typeof(FolderAction), "folder")]
 public abstract record ButtonAction;
 
 /// <summary>A media key: playPause, next, previous, volumeUp, volumeDown or mute.</summary>
@@ -35,6 +36,9 @@ public sealed record StatAction(string Stat, string Style) : ButtonAction
 /// <paramref name="Style"/> is one of <see cref="Styles"/> (left out: tinted), and <paramref name="Show"/> one of
 /// <see cref="Shows"/> (left out: icon and label).
 /// </summary>
+/// <summary>A button that opens more buttons on the phone, with a way back. Folders don't hold folders.</summary>
+public sealed record FolderAction(IReadOnlyList<DeckButton> Buttons) : ButtonAction;
+
 public sealed record DeckButton(
     string Id,
     string Label,
@@ -135,8 +139,11 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
         return problem is null ? deck : null;
     }
 
+    /// <summary>The button with this id, on a page or inside a folder.</summary>
     public DeckButton? Find(string id) =>
-        Pages.SelectMany(page => page.Buttons).FirstOrDefault(button => button.Id == id);
+        Pages.SelectMany(page => page.Buttons)
+            .SelectMany(button => button.Action is FolderAction folder ? folder.Buttons.Prepend(button) : [button])
+            .FirstOrDefault(button => button.Id == id);
 
     /// <summary>Why this deck can't be used, or null when it is fine.</summary>
     public string? Problem()
@@ -162,28 +169,53 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
             {
                 return $"A page can hold up to {MaxButtonsPerPage} buttons.";
             }
-            foreach (var button in page.Buttons)
+            if (ButtonsProblem(page.Buttons, ids, inFolder: false) is { } problem)
             {
-                if (button is null || button.Id.Length is 0 or > MaxIdLength || !ids.Add(button.Id))
+                return problem;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Why one of these buttons can't be used, looking inside folders too. Ids must be unique deck wide.</summary>
+    static string? ButtonsProblem(IReadOnlyList<DeckButton> buttons, HashSet<string> ids, bool inFolder)
+    {
+        foreach (var button in buttons)
+        {
+            if (button is null || button.Id.Length is 0 or > MaxIdLength || !ids.Add(button.Id))
+            {
+                return "Every button needs its own id.";
+            }
+            if (!IsShortText(button.Label))
+            {
+                return $"Every button needs a label of 1 to {MaxTextLength} characters.";
+            }
+            if (button.Icon is not null && !IsIconName(button.Icon)
+                || button.Color is not null && !DeckButton.Colors.Contains(button.Color)
+                || button.Size is not null && !DeckButton.Sizes.Contains(button.Size)
+                || button.Style is not null && !DeckButton.Styles.Contains(button.Style)
+                || button.Show is not null && !DeckButton.Shows.Contains(button.Show))
+            {
+                return $"The button \"{button.Label}\" has a look DeskPilot doesn't know.";
+            }
+            if (button.Action is FolderAction folder)
+            {
+                if (inFolder)
                 {
-                    return "Every button needs its own id.";
+                    return $"The folder \"{button.Label}\" is inside another folder. Folders hold buttons only.";
                 }
-                if (!IsShortText(button.Label))
+                if (folder.Buttons.Count > MaxButtonsPerPage)
                 {
-                    return $"Every button needs a label of 1 to {MaxTextLength} characters.";
+                    return $"A folder can hold up to {MaxButtonsPerPage} buttons.";
                 }
-                if (button.Icon is not null && !IsIconName(button.Icon)
-                    || button.Color is not null && !DeckButton.Colors.Contains(button.Color)
-                    || button.Size is not null && !DeckButton.Sizes.Contains(button.Size)
-                    || button.Style is not null && !DeckButton.Styles.Contains(button.Style)
-                    || button.Show is not null && !DeckButton.Shows.Contains(button.Show))
+                if (ButtonsProblem(folder.Buttons, ids, inFolder: true) is { } problem)
                 {
-                    return $"The button \"{button.Label}\" has a look DeskPilot doesn't know.";
+                    return problem;
                 }
-                if (!CanRun(button.Action))
-                {
-                    return $"DeskPilot can't run the button \"{button.Label}\". Check its keys or what it opens.";
-                }
+            }
+            else if (!CanRun(button.Action))
+            {
+                return $"DeskPilot can't run the button \"{button.Label}\". Check its keys or what it opens.";
             }
         }
         return null;

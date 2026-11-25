@@ -95,6 +95,7 @@ class _DeckPageState extends State<DeckPage> {
   DateTime _telemetryAt = DateTime(0);
   Map<String, List<double>> _history = const {};
   NowPlaying? _media;
+  String? _folder;
   int _page = 0;
   bool _editing = false;
   bool _loading = true;
@@ -221,6 +222,7 @@ class _DeckPageState extends State<DeckPage> {
       _telemetry = const {};
       _history = const {};
       _media = null;
+      _folder = null;
       _page = 0;
       _editing = false;
       _busy = false;
@@ -376,7 +378,12 @@ class _DeckPageState extends State<DeckPage> {
                   editing: _editing,
                   onPress: agent == null ? null : _press,
                   onChange: _save,
-                  onPageChanged: (page) => setState(() => _page = page),
+                  onPageChanged: (page) => setState(() {
+                    _page = page;
+                    _folder = null;
+                  }),
+                  folder: _folder,
+                  onFolderChanged: (id) => setState(() => _folder = id),
                   stats: {..._stats, ..._telemetry},
                   history: _history,
                   header: _homeCards(page, media, agent),
@@ -408,7 +415,11 @@ class _DeckPageState extends State<DeckPage> {
 extension on _DeckPageState {
   Widget? _homeCards(int page, NowPlaying? media, AgentConnection? agent) {
     final settings = widget.settings;
-    if (_editing || (page != 0 && !settings.cardsOnEveryPage)) return null;
+    if (_editing ||
+        _folder != null ||
+        (page != 0 && !settings.cardsOnEveryPage)) {
+      return null;
+    }
     final top = [
       if (settings.showMusic && media != null)
         Expanded(

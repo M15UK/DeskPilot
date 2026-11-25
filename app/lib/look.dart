@@ -182,6 +182,7 @@ IconData _autoIcon(ButtonAction action) => switch (action) {
   MediaAction(media: 'mute') => Icons.volume_off_rounded,
   MediaAction() => Icons.music_note_rounded,
   KeysAction() => Icons.keyboard_rounded,
+  FolderAction() => Icons.folder_rounded,
   OpenAction(:final target) when target.contains('://') =>
     Icons.language_rounded,
   OpenAction() => Icons.open_in_new_rounded,
@@ -197,6 +198,7 @@ IconData _autoIcon(ButtonAction action) => switch (action) {
 Color _autoColor(ButtonAction action) => switch (action) {
   MediaAction() => deckColors['teal']!,
   KeysAction() => deckColors['blue']!,
+  FolderAction() => deckColors['amber']!,
   OpenAction() => deckColors['purple']!,
   StatAction(:final stat) => statColor(stat),
 };

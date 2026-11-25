@@ -38,6 +38,16 @@ public sealed class HandleTests : IDisposable
     }
 
     [Fact]
+    public async Task AButtonInsideAFolderCanBePressed()
+    {
+        decks.Save(new Deck([new DeckPage("Main",
+            [new DeckButton("f", "Racing", new FolderAction([new DeckButton("pit", "Pit", new KeysAction(["P"]))]))])]));
+
+        Assert.Null(await HandleAsync("""{"type":"press","id":"pit"}"""));
+        Assert.Equal(new KeysAction(["P"]), Assert.Single(ran), new ActionComparer());
+    }
+
+    [Fact]
     public async Task TheMusicCardPressesMediaKeys()
     {
         Assert.Null(await HandleAsync("""{"type":"mediaKey","media":"next"}"""));
@@ -317,4 +327,13 @@ public class ServerTests : IAsyncLifetime
         deckMessage.RootElement.GetProperty("deck").GetProperty("pages")[0].GetProperty("name").GetString();
 
     static CancellationToken Timeout() => new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token;
+}
+
+/// Records compare lists by reference; this compares key buttons by their combos.
+sealed class ActionComparer : IEqualityComparer<ButtonAction>
+{
+    public bool Equals(ButtonAction? x, ButtonAction? y) =>
+        x is KeysAction a && y is KeysAction b ? a.Combos.SequenceEqual(b.Combos) : object.Equals(x, y);
+
+    public int GetHashCode(ButtonAction action) => 0;
 }

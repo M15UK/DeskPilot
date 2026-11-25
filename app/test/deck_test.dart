@@ -116,6 +116,65 @@ void main() {
     expect(deck.pages[0].buttons[2].size, 'wide');
   });
 
+  test('reads a folder the PC sends and writes it back the same', () {
+    const json =
+        '{"pages":[{"name":"Main","buttons":[{"id":"f","label":"Streaming",'
+        '"action":{"kind":"folder","buttons":[{"id":"obs","label":"OBS",'
+        '"action":{"kind":"open","target":"obs64.exe"}}]}}]}]}';
+
+    final deck = Deck.fromJson(jsonDecode(json))!;
+
+    expect(jsonEncode(deck.toJson()), json);
+    expect(
+      (deck.pages[0].buttons[0].action as FolderAction).buttons.single.id,
+      'obs',
+    );
+  });
+
+  test('refuses a folder inside a folder', () {
+    const json =
+        '{"pages":[{"name":"Main","buttons":[{"id":"f","label":"F",'
+        '"action":{"kind":"folder","buttons":[{"id":"g","label":"G",'
+        '"action":{"kind":"folder","buttons":[]}}]}}]}]}';
+
+    expect(Deck.fromJson(jsonDecode(json)), isNull);
+  });
+
+  test('adds, moves and deletes buttons inside a folder', () {
+    const a = DeckButton(id: 'a', label: 'A', action: MediaAction('next'));
+    const b = DeckButton(id: 'b', label: 'B', action: MediaAction('mute'));
+    final deck = sample()
+        .withButton(
+          0,
+          const DeckButton(id: 'f', label: 'F', action: FolderAction([])),
+        )
+        .withButtonInFolder('f', a)
+        .withButtonInFolder('f', b)
+        .movedButton('b', -1);
+    List<String> inside(Deck deck) => [
+      for (final button
+          in (deck.pages[0].buttons.last.action as FolderAction).buttons)
+        button.id,
+    ];
+
+    expect(inside(deck), ['b', 'a']);
+    expect(inside(deck.withoutButton('a')), ['b']);
+    expect(
+      inside(
+        deck.withButton(
+          0,
+          const DeckButton(
+            id: 'a',
+            label: 'Renamed',
+            action: MediaAction('next'),
+          ),
+        ),
+      ),
+      ['b', 'a'],
+      reason: 'an edited button stays inside its folder',
+    );
+  });
+
   test('new button ids are unique', () {
     expect({for (var i = 0; i < 100; i++) newButtonId()}, hasLength(100));
   });

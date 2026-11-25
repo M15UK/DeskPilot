@@ -67,6 +67,7 @@ Messages can be up to 1 MB. A bigger one closes the connection with close code 1
 | `media` | `media` is `playPause`, `next`, `previous`, `volumeUp`, `volumeDown` or `mute`. |
 | `keys` | 1 to 20 combos, run 50 ms apart. A combo is up to 6 keys joined by `+`: `Ctrl`, `Shift`, `Alt`, `Win`, `A` to `Z`, `0` to `9`, `F1` to `F24`, `Enter`, `Esc`, `Tab`, `Space`, `Backspace`, `Delete`, `Insert`, `Home`, `End`, `PageUp`, `PageDown`, `Up`, `Down`, `Left`, `Right`, `PrintScreen`. Keys are sent as scan codes, so games see them. |
 | `open` | `target` is up to 1000 characters: an app, file, folder or link, opened the way a double click would. |
+| `folder` | `buttons` is a list of up to 32 buttons that the phone shows when the folder is tapped, with a Back tile. A folder can't hold another folder, and button ids are unique across the whole deck, folders included. |
 | `stat` | Shows a reading instead of doing something. `stat` is `cpuLoad`, `gpuLoad`, `gpuTemp`, `ramLoad`, `cpuTemp`, `fps`, or a telemetry name (`speed`, `rpm`, `gear`, `fuel`, `lap`, `position`, `lapTime`, `lastLap`, `bestLap`, `tyreFlTemp`, `tyreFrTemp`, `tyreRlTemp`, `tyreRrTemp`), and `style` is `number`, `gauge` or `chart`. Pressing it does nothing. |
 
 A deck has 1 to 20 pages, a page up to 32 buttons, and every page name and button label is 1 to 40

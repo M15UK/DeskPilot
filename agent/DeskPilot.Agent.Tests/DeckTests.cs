@@ -98,6 +98,8 @@ public class DeckTests
     [InlineData("""{"pages":[{"name":"Main","buttons":[],"background":"plaid"}]}""")]
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},"style":"glitter"}]}]}""")]
     [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},"show":"nothing"}]}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"f","label":"Streaming","action":{"kind":"folder","buttons":[{"id":"inner","label":"Inner","action":{"kind":"folder","buttons":[]}}]}}]}]}""")]
+    [InlineData("""{"pages":[{"name":"Main","buttons":[{"id":"f","label":"Streaming","action":{"kind":"folder","buttons":[{"id":"f","label":"Same id","action":{"kind":"media","media":"next"}}]}}]}]}""")]
     [InlineData("""["not","a","deck"]""")]
     public void BadDecksAreRefused(string json)
     {
@@ -105,6 +107,18 @@ public class DeckTests
 
         Assert.Null(deck);
         Assert.False(string.IsNullOrWhiteSpace(problem));
+    }
+
+    [Fact]
+    public void AFolderKeepsItsButtons()
+    {
+        const string json = """{"pages":[{"name":"Main","buttons":[{"id":"f","label":"Streaming","action":{"kind":"folder","buttons":[{"id":"obs","label":"OBS","action":{"kind":"open","target":"obs64.exe"}}]}}]}]}""";
+
+        var deck = Deck.Read(JsonDocument.Parse(json).RootElement, out var problem);
+
+        Assert.Null(problem);
+        Assert.Equal(json, Json(deck!));
+        Assert.Equal(new OpenAction("obs64.exe"), deck!.Find("obs")!.Action);
     }
 
     [Fact]

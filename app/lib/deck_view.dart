@@ -39,6 +39,8 @@ class DeckView extends StatelessWidget {
     this.history = const {},
     this.header,
     this.tools = const [],
+    this.folder,
+    this.onFolderChanged,
   });
 
   final Deck deck;
@@ -62,6 +64,18 @@ class DeckView extends StatelessWidget {
   /// Extra buttons at the end of the page rail, like settings while full
   /// screen hides the top bar.
   final List<RailTool> tools;
+
+  /// The id of the open folder on this page, or null for the page itself.
+  final String? folder;
+  final ValueChanged<String?>? onFolderChanged;
+
+  /// The open folder's button, when [folder] is still a folder on this page.
+  DeckButton? get _openFolder {
+    for (final button in deck.pages[page].buttons) {
+      if (button.id == folder && button.action is FolderAction) return button;
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -113,7 +127,11 @@ class DeckView extends StatelessWidget {
 
   Widget _grid(BuildContext context) {
     final shown = deck.pages[page];
-    final buttons = shown.buttons;
+    final open = _openFolder;
+    final buttons = switch (open?.action) {
+      FolderAction(:final buttons) => buttons,
+      _ => shown.buttons,
+    };
     final adding = editing && buttons.length < _maxButtonsPerPage;
     final grid = TileGrid(
       cell: _cellSizes[shown.size] ?? _cellSizes[null]!,
@@ -125,12 +143,20 @@ class DeckView extends StatelessWidget {
         12,
       ),
       spans: [
+        if (open != null) (1, 1),
         for (final button in buttons) _spans[button.size] ?? (1, 1),
         if (adding) (1, 1),
       ],
       children: [
+        if (open != null)
+          KeyTile(
+            icon: Icons.arrow_back_rounded,
+            label: 'Back',
+            color: deckColors['gray']!,
+            onTap: () => onFolderChanged?.call(null),
+          ),
         for (final (index, button) in buttons.indexed)
-          _placed(context, button, index),
+          _placed(context, button, index, buttons),
         if (adding)
           OutlinedButton.icon(
             onPressed: () => _editButton(context, null),
@@ -164,15 +190,18 @@ class DeckView extends StatelessWidget {
   }
 
   /// A tile, which in edit mode can be dragged onto another tile's place.
-  Widget _placed(BuildContext context, DeckButton button, int index) {
+  Widget _placed(
+    BuildContext context,
+    DeckButton button,
+    int index,
+    List<DeckButton> buttons,
+  ) {
     final tile = _tile(context, button);
     if (!editing) return tile;
     return DragTarget<String>(
       onWillAcceptWithDetails: (drag) => drag.data != button.id,
       onAcceptWithDetails: (drag) {
-        final from = deck.pages[page].buttons.indexWhere(
-          (b) => b.id == drag.data,
-        );
+        final from = buttons.indexWhere((b) => b.id == drag.data);
         if (from >= 0) onChange(deck.movedButton(drag.data, index - from));
       },
       builder: (context, hovering, _) => LayoutBuilder(
@@ -232,13 +261,20 @@ class DeckView extends StatelessWidget {
       );
     }
     final press = onPress;
+    final opens = button.action is FolderAction;
     return KeyTile(
       icon: buttonIcon(button),
       label: button.label,
       color: buttonColor(button),
       style: button.style,
       show: button.show,
-      onTap: edit ?? (press == null ? null : () => press(button.id)),
+      onTap:
+          edit ??
+          (opens
+              ? () => onFolderChanged?.call(button.id)
+              : press == null
+              ? null
+              : () => press(button.id)),
     );
   }
 
@@ -287,16 +323,25 @@ class DeckView extends StatelessWidget {
   );
 
   Future<void> _editButton(BuildContext context, DeckButton? button) async {
+    final open = _openFolder;
     final edit = await showDialog<ButtonEdit>(
       context: context,
-      builder: (_) => ButtonEditor(button: button),
+      builder: (_) => ButtonEditor(button: button, canBeFolder: open == null),
     );
-    if (edit == null) return;
-    onChange(switch (edit) {
-      SaveButton(:final button) => deck.withButton(page, button),
-      DeleteButton(:final id) => deck.withoutButton(id),
-      MoveButton(:final id, :final by) => deck.movedButton(id, by),
-    });
+    switch (edit) {
+      case SaveButton(button: final saved) when button == null && open != null:
+        onChange(deck.withButtonInFolder(open.id, saved));
+      case SaveButton(button: final saved):
+        onChange(deck.withButton(page, saved));
+      case DeleteButton(:final id):
+        onChange(deck.withoutButton(id));
+      case MoveButton(:final id, :final by):
+        onChange(deck.movedButton(id, by));
+      case OpenFolder(:final id):
+        onFolderChanged?.call(id);
+      case null:
+        break;
+    }
   }
 
   Future<void> _addPage(BuildContext context) async {
