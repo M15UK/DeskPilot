@@ -149,7 +149,8 @@ class _SettingsPageState extends State<SettingsPage> {
           _Switch(
             title: 'Vibrate',
             subtitle: widget.canVibrate
-                ? 'A small buzz each time you press a button.'
+                ? 'A small buzz each time you press a button. Some tablets, '
+                      'like the Galaxy Tab S6, have no motor and stay still.'
                 : "This tablet has no vibration motor, so it can't buzz.",
             value: s.haptics,
             onChanged: (on) => _change(s.copyWith(haptics: on)),

@@ -212,6 +212,42 @@ void main() {
     expect(twice.pages[0].buttons, hasLength(once.pages[0].buttons.length));
   });
 
+  test('a button keeps where it sits and its size, like on the PC', () {
+    // The same text as AButtonCanSitAnywhereAtAnySize on the PC.
+    const json =
+        '{"pages":[{"name":"Home","buttons":['
+        '{"id":"m","label":"Music","action":{"kind":"music"},"x":2,"y":3,"w":4,"h":2}'
+        ']}]}';
+
+    final deck = Deck.fromJson(jsonDecode(json))!;
+
+    expect(jsonEncode(deck.toJson()), json);
+    expect(deck.pages[0].buttons.single.span, (4, 2));
+  });
+
+  test('an old shape name still gives the size in cells', () {
+    const wide = DeckButton(
+      id: 'w',
+      label: 'W',
+      action: MediaAction('next'),
+      size: 'huge',
+    );
+
+    expect(wide.span, (3, 2));
+  });
+
+  test('places buttons by hand, in folders too', () {
+    final deck = sample().withPlaces({
+      'pit': (x: 3, y: 1, w: 2, h: 2),
+      'cpu': (x: 0, y: 0, w: 1, h: 1),
+    });
+
+    final pit = deck.find('pit')!;
+    expect((pit.x, pit.y, pit.span), (3, 1, (2, 2)));
+    expect(deck.find('cpu')!.x, 0);
+    expect(deck.find('ac')!.x, isNull, reason: 'not moved');
+  });
+
   test('new button ids are unique', () {
     expect({for (var i = 0; i < 100; i++) newButtonId()}, hasLength(100));
   });

@@ -270,7 +270,9 @@ void main() {
     expect(saved.color, 'amber');
   });
 
-  testWidgets('dragging a button onto another moves it there', (tester) async {
+  testWidgets('dragging a button puts it in an empty spot and pins the rest', (
+    tester,
+  ) async {
     const two = Deck([
       DeckPage(
         name: 'Main',
@@ -286,12 +288,15 @@ void main() {
       tester.getCenter(find.text('Second')),
     );
     await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
-    await drag.moveTo(tester.getCenter(find.text('First')));
+    await drag.moveBy(const Offset(0, 180));
     await tester.pump();
     await drag.up();
     await tester.pumpAndSettle();
 
-    expect([for (final b in changed!.pages[0].buttons) b.id], ['b', 'a']);
+    final first = changed!.find('a')!;
+    final second = changed!.find('b')!;
+    expect((first.x, first.y), (0, 0), reason: 'pinned where it was');
+    expect(second.y, 1, reason: 'one row down');
   });
 
   testWidgets('a button can be wide, solid and show only its icon', (
@@ -310,7 +315,40 @@ void main() {
     await tester.pumpAndSettle();
 
     final saved = changed!.pages[0].buttons.single;
-    expect((saved.size, saved.style, saved.show), ('wide', 'solid', 'icon'));
+    expect((saved.span, saved.style, saved.show), ((2, 1), 'solid', 'icon'));
+  });
+
+  testWidgets('a size made by hand shows as custom, and a shape resets it', (
+    tester,
+  ) async {
+    const sized = Deck([
+      DeckPage(
+        name: 'Main',
+        buttons: [
+          DeckButton(
+            id: 's',
+            label: 'Stretched',
+            action: MediaAction('next'),
+            x: 1,
+            y: 0,
+            w: 4,
+            h: 2,
+          ),
+        ],
+      ),
+    ]);
+    await tester.pumpWidget(host(editing: true, shown: sized));
+
+    await tester.tap(find.text('Stretched'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Shape (now a custom 4 by 2)'));
+    await tester.tap(find.text('Normal'));
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final saved = changed!.pages[0].buttons.single;
+    expect((saved.span, saved.x, saved.y), ((1, 1), 1, 0));
   });
 
   testWidgets('an icon only button still says its name to screen readers', (

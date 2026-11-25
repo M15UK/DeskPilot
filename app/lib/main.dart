@@ -426,9 +426,11 @@ class _DeckPageState extends State<DeckPage> {
   );
 
   /// Full screen hides the top bar on tablets; its buttons move to the rail.
+  /// Only while the deck (and so the rail) shows; otherwise there would be no
+  /// way to reach settings.
   bool _barHidden(BuildContext context) =>
       widget.settings.fullScreen &&
-      _saved != null &&
+      _deck != null &&
       MediaQuery.sizeOf(context).width >= 600;
 
   @override

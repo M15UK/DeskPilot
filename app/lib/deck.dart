@@ -175,6 +175,10 @@ class DeckButton {
     this.style,
     this.show,
     this.image,
+    this.x,
+    this.y,
+    this.w,
+    this.h,
   });
 
   final String id;
@@ -189,6 +193,20 @@ class DeckButton {
   /// The id of the button's own picture on the PC (see [pictureId]).
   final String? image;
 
+  /// The cell of the button's top left corner, when placed by hand.
+  final int? x;
+  final int? y;
+
+  /// The button's size in cells, when sized by hand (see [span]).
+  final int? w;
+  final int? h;
+
+  /// The button's size in cells (wide, tall): its own, or from its shape.
+  (int, int) get span {
+    final shape = shapeSpans[size];
+    return (w ?? shape?.$1 ?? 1, h ?? shape?.$2 ?? 1);
+  }
+
   Map<String, Object> toJson() => {
     'id': id,
     'label': label,
@@ -199,21 +217,30 @@ class DeckButton {
     'style': ?style,
     'show': ?show,
     'image': ?image,
+    'x': ?x,
+    'y': ?y,
+    'w': ?w,
+    'h': ?h,
   };
 
   DeckButton _withAction(ButtonAction action) => _copy(action: action);
 
-  DeckButton _copy({String? id, ButtonAction? action}) => DeckButton(
-    id: id ?? this.id,
-    label: label,
-    action: action ?? this.action,
-    icon: icon,
-    color: color,
-    size: size,
-    style: style,
-    show: show,
-    image: image,
-  );
+  DeckButton _copy({String? id, ButtonAction? action, CellPlace? place}) =>
+      DeckButton(
+        id: id ?? this.id,
+        label: label,
+        action: action ?? this.action,
+        x: place?.x ?? x,
+        y: place?.y ?? y,
+        w: place?.w ?? w,
+        h: place?.h ?? h,
+        icon: icon,
+        color: color,
+        size: size,
+        style: style,
+        show: show,
+        image: image,
+      );
 
   static DeckButton? fromJson(Object? json) {
     if (json
@@ -234,6 +261,10 @@ class DeckButton {
           style: _text(map['style']),
           show: _text(map['show']),
           image: _text(map['image']),
+          x: _whole(map['x']),
+          y: _whole(map['y']),
+          w: _whole(map['w']),
+          h: _whole(map['h']),
         );
       }
     }
@@ -333,6 +364,20 @@ const pageSizes = {
 
 String? _text(Object? value) => value is String ? value : null;
 
+int? _whole(Object? value) => value is int ? value : null;
+
+/// Where a button sits and how big it is, in cells.
+typedef CellPlace = ({int x, int y, int w, int h});
+
+/// The size in cells (wide, tall) of each shape name.
+const shapeSpans = {
+  'wide': (2, 1),
+  'tall': (1, 2),
+  'big': (2, 2),
+  'wider': (3, 1),
+  'huge': (3, 2),
+};
+
 /// The pages of buttons the PC keeps. Each edit returns a new deck, which the
 /// app sends to the PC to check and save.
 class Deck {
@@ -431,6 +476,14 @@ class Deck {
       background: background,
       wallpaper: wallpaper,
     ),
+  );
+
+  /// Puts buttons where [places] say, by id, on pages and in folders.
+  Deck withPlaces(Map<String, CellPlace> places) => _editLists(
+    (list) => [
+      for (final b in list)
+        if (places[b.id] case final place?) b._copy(place: place) else b,
+    ],
   );
 
   /// Puts a wide music tile and a clock at the start of the first page,

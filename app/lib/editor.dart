@@ -124,7 +124,18 @@ class _ButtonEditorState extends State<ButtonEditor> {
   // Null means automatic: picked from what the button does.
   late String? _icon = widget.button?.icon;
   late String? _color = widget.button?.color;
-  late String? _size = widget.button?.size;
+  // The size in cells; a shape chip sets it, and a size made by hand on the
+  // deck shows as custom.
+  late (int, int) _cells = widget.button?.span ?? (1, 1);
+
+  /// The shape chip for [_cells], or a missing key when it's a custom size.
+  String? get _shape => _cells == (1, 1)
+      ? null
+      : shapeSpans.entries
+                .where((entry) => entry.value == _cells)
+                .map((entry) => entry.key)
+                .firstOrNull ??
+            'custom';
   late String? _look = widget.button?.style;
   late String? _show = widget.button?.show;
   late String? _image = widget.button?.image;
@@ -265,7 +276,11 @@ class _ButtonEditorState extends State<ButtonEditor> {
       action: action,
       icon: widgetTile ? null : _icon,
       color: widgetTile ? null : _color,
-      size: _size,
+      // The place stays; the size is in cells (1 by 1 needs no saying).
+      x: widget.button?.x,
+      y: widget.button?.y,
+      w: _cells == (1, 1) ? null : _cells.$1,
+      h: _cells == (1, 1) ? null : _cells.$2,
       style: plain ? null : _look,
       show: plain ? null : _show,
       image: plain ? null : _image,
@@ -409,7 +424,9 @@ class _ButtonEditorState extends State<ButtonEditor> {
                       onSelect: (picked) => setState(() {
                         _widget = picked ?? _widget;
                         // Music reads best wide; pick another shape any time.
-                        if (_widget == 'music') _size ??= 'wider';
+                        if (_widget == 'music' && _cells == (1, 1)) {
+                          _cells = (3, 1);
+                        }
                       }),
                     ),
                     if (_widget == 'photos')
@@ -504,10 +521,13 @@ class _ButtonEditorState extends State<ButtonEditor> {
                   }),
                 ),
               OptionChips(
-                title: 'Shape',
+                title: _shape == 'custom'
+                    ? 'Shape (now a custom ${_cells.$1} by ${_cells.$2})'
+                    : 'Shape',
                 choices: buttonSizes,
-                selected: _size,
-                onSelect: (size) => setState(() => _size = size),
+                selected: _shape,
+                onSelect: (shape) =>
+                    setState(() => _cells = shapeSpans[shape] ?? (1, 1)),
               ),
               if (_kind != 'stat' && _kind != 'widget') ...[
                 OptionChips(

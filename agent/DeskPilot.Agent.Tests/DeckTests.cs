@@ -144,6 +144,33 @@ public class DeckTests
     }
 
     [Fact]
+    public void AButtonCanSitAnywhereAtAnySize()
+    {
+        const string json =
+            """{"pages":[{"name":"Home","buttons":[""" +
+            """{"id":"m","label":"Music","action":{"kind":"music"},"x":2,"y":3,"w":4,"h":2}""" +
+            """]}]}""";
+
+        var deck = Deck.Read(JsonDocument.Parse(json).RootElement, out var problem);
+
+        Assert.Null(problem);
+        Assert.Equal(json, Json(deck!));
+    }
+
+    [Theory]
+    [InlineData("\"x\":-1,\"y\":0")]
+    [InlineData("\"x\":0,\"y\":500")]
+    [InlineData("\"w\":0,\"h\":1")]
+    [InlineData("\"w\":20,\"h\":1")]
+    [InlineData("\"x\":10,\"w\":8")]
+    public void APlaceOffTheGridIsRefused(string place)
+    {
+        var json = $$"""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},{{place}}}]}]}""";
+
+        Assert.Null(Deck.Read(JsonDocument.Parse(json).RootElement, out _));
+    }
+
+    [Fact]
     public void APageWithTooManyButtonsIsRefused()
     {
         var buttons = Enumerable.Range(0, Deck.MaxButtonsPerPage + 1)

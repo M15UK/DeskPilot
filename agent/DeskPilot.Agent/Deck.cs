@@ -38,7 +38,9 @@ public sealed record StatAction(string Stat, string Style) : ButtonAction
 /// of <see cref="Sizes"/>: two places wide, two tall, or both. Left out, the button takes one place.
 /// <paramref name="Style"/> is one of <see cref="Styles"/> (left out: tinted), and <paramref name="Show"/> one of
 /// <see cref="Shows"/> (left out: icon and label). <paramref name="Image"/> is the id of a picture in the
-/// <see cref="ImageStore"/>, shown instead of the icon.
+/// <see cref="ImageStore"/>, shown instead of the icon. <paramref name="X"/> and <paramref name="Y"/> are the cell of
+/// its top left corner, and <paramref name="W"/> and <paramref name="H"/> its size in cells, when it was placed by
+/// hand.
 /// </summary>
 /// <summary>A button that opens more buttons on the phone, with a way back. Folders don't hold folders.</summary>
 public sealed record FolderAction(IReadOnlyList<DeckButton> Buttons) : ButtonAction;
@@ -64,8 +66,25 @@ public sealed record DeckButton(
     string? Size = null,
     string? Style = null,
     string? Show = null,
-    string? Image = null)
+    string? Image = null,
+    int? X = null,
+    int? Y = null,
+    int? W = null,
+    int? H = null)
 {
+    /// <summary>The grid is up to this many cells wide; a phone shows fewer and moves what doesn't fit.</summary>
+    public const int MaxColumns = 16;
+    public const int MaxRows = 200;
+    public const int MaxSpan = 12;
+
+    /// <summary>Whether the button's place and size fit the grid. Left out, the phone places it.</summary>
+    public bool FitsTheGrid() =>
+        X is null or (>= 0 and < MaxColumns)
+        && Y is null or (>= 0 and < MaxRows)
+        && W is null or (>= 1 and <= MaxSpan)
+        && H is null or (>= 1 and <= MaxSpan)
+        && (X ?? 0) + (W ?? 1) <= MaxColumns;
+
     public static readonly FrozenSet<string> Styles = new[] { "solid", "outline" }.ToFrozenSet();
 
     public static readonly FrozenSet<string> Shows = new[] { "icon", "name" }.ToFrozenSet();
@@ -217,7 +236,8 @@ public sealed record Deck(IReadOnlyList<DeckPage> Pages)
                 || button.Size is not null && !DeckButton.Sizes.Contains(button.Size)
                 || button.Style is not null && !DeckButton.Styles.Contains(button.Style)
                 || button.Show is not null && !DeckButton.Shows.Contains(button.Show)
-                || button.Image is not null && !ImageStore.IsId(button.Image))
+                || button.Image is not null && !ImageStore.IsId(button.Image)
+                || !button.FitsTheGrid())
             {
                 return $"The button \"{button.Label}\" has a look DeskPilot doesn't know.";
             }

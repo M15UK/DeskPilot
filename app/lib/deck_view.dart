@@ -19,15 +19,6 @@ typedef RailTool = ({IconData icon, String label, VoidCallback onTap});
 /// About how wide a button is for each page size.
 const _cellSizes = {'small': 120.0, null: 170.0, 'large': 230.0, 'huge': 300.0};
 
-/// How many cells (wide, tall) each button shape takes.
-const _spans = {
-  'wide': (2, 1),
-  'tall': (1, 2),
-  'big': (2, 2),
-  'wider': (3, 1),
-  'huge': (3, 2),
-};
-
 /// Wider than this, pages sit in a rail on the left (tablets); narrower, they
 /// are chips under the grid (phones).
 const _railFromWidth = 600.0;
@@ -163,11 +154,31 @@ class DeckView extends StatelessWidget {
         shown.background == null ? 0 : 10,
         12,
       ),
-      spans: [
-        if (open != null) (1, 1),
-        for (final button in buttons) _spans[button.size] ?? (1, 1),
-        if (adding) (1, 1),
+      editing: editing,
+      tiles: [
+        if (open != null) (w: 1, h: 1, x: null, y: null),
+        for (final button in buttons)
+          (w: button.span.$1, h: button.span.$2, x: button.x, y: button.y),
+        if (adding) (w: 1, h: 1, x: null, y: null),
       ],
+      // The Back and Add button tiles stay where the grid puts them.
+      movable: {
+        for (var i = 0; i < buttons.length; i++) i + (open == null ? 0 : 1),
+      },
+      // Moving or resizing one tile pins every tile where it is, so nothing
+      // else jumps around.
+      onPlaced: (places) => onChange(
+        deck.withPlaces({
+          for (final (index, button) in buttons.indexed)
+            if (places[index + (open == null ? 0 : 1)] case final place)
+              button.id: (
+                x: place.column,
+                y: place.row,
+                w: place.width,
+                h: place.height,
+              ),
+        }),
+      ),
       children: [
         if (open != null)
           KeyTile(
@@ -176,8 +187,7 @@ class DeckView extends StatelessWidget {
             color: deckColors['gray']!,
             onTap: () => onFolderChanged?.call(null),
           ),
-        for (final (index, button) in buttons.indexed)
-          _placed(context, button, index, buttons),
+        for (final button in buttons) _placed(context, button),
         if (adding)
           OutlinedButton.icon(
             onPressed: () => _editButton(context, null),
@@ -227,61 +237,27 @@ class DeckView extends StatelessWidget {
     );
   }
 
-  /// A tile, which in edit mode can be dragged onto another tile's place.
-  Widget _placed(
-    BuildContext context,
-    DeckButton button,
-    int index,
-    List<DeckButton> buttons,
-  ) {
+  /// A tile, with a hint in edit mode that a long press moves it.
+  Widget _placed(BuildContext context, DeckButton button) {
     final tile = _tile(context, button);
     if (!editing) return tile;
-    return DragTarget<String>(
-      onWillAcceptWithDetails: (drag) => drag.data != button.id,
-      onAcceptWithDetails: (drag) {
-        final from = buttons.indexWhere((b) => b.id == drag.data);
-        if (from >= 0) onChange(deck.movedButton(drag.data, index - from));
-      },
-      builder: (context, hovering, _) => LayoutBuilder(
-        builder: (context, size) => LongPressDraggable<String>(
-          data: button.id,
-          feedback: SizedBox.fromSize(size: size.biggest, child: tile),
-          childWhenDragging: Opacity(opacity: 0.3, child: tile),
-          child: Stack(
-            children: [
-              Positioned.fill(child: tile),
-              if (hovering.isNotEmpty)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(
-                          DeckLook.of(context).radius,
-                        ),
-                        border: Border.all(
-                          color: deckColors['blue']!,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              // Top right: stat tiles have their label top left.
-              Positioned(
-                top: 6,
-                right: 6,
-                child: IgnorePointer(
-                  child: Icon(
-                    Icons.drag_indicator_rounded,
-                    size: 16,
-                    color: DeckLook.of(context).muted,
-                  ),
-                ),
-              ),
-            ],
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        tile,
+        // Top right: stat tiles have their label top left.
+        Positioned(
+          top: 6,
+          right: 6,
+          child: IgnorePointer(
+            child: Icon(
+              Icons.drag_indicator_rounded,
+              size: 16,
+              color: DeckLook.of(context).muted,
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
