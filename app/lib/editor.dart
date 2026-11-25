@@ -5,6 +5,7 @@ import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/look.dart';
 import 'package:deskpilot/now_playing.dart';
 import 'package:deskpilot/pictures.dart';
+import 'package:deskpilot/tile_grid.dart';
 import 'package:deskpilot/tiles.dart';
 import 'package:flutter/material.dart';
 
@@ -124,18 +125,46 @@ class _ButtonEditorState extends State<ButtonEditor> {
   // Null means automatic: picked from what the button does.
   late String? _icon = widget.button?.icon;
   late String? _color = widget.button?.color;
-  // The size in cells; a shape chip sets it, and a size made by hand on the
-  // deck shows as custom.
-  late (int, int) _cells = widget.button?.span ?? (1, 1);
+  // The size in eighths of a cell: a shape chip or the sliders set it, and a
+  // size that matches no shape shows as custom.
+  late (int, int) _fine = (
+    widget.button?.fine.width ?? eighths,
+    widget.button?.fine.height ?? eighths,
+  );
+  static const _normal = (eighths, eighths);
 
-  /// The shape chip for [_cells], or a missing key when it's a custom size.
-  String? get _shape => _cells == (1, 1)
+  /// The shape chip for [_fine], or 'custom' when it matches none.
+  String? get _shape => _fine == _normal
       ? null
       : shapeSpans.entries
-                .where((entry) => entry.value == _cells)
+                .where(
+                  (entry) =>
+                      (entry.value.$1 * eighths, entry.value.$2 * eighths) ==
+                      _fine,
+                )
                 .map((entry) => entry.key)
                 .firstOrNull ??
             'custom';
+
+  /// A slider for the width or height, from half a cell to twelve, in eighths.
+  Widget _sizeSlider(String name, int value, ValueChanged<int> onChanged) =>
+      Row(
+        children: [
+          SizedBox(width: 120, child: Text('$name ${cellCount(value)}')),
+          Expanded(
+            child: Slider(
+              value: value.clamp(eighths ~/ 2, 12 * eighths).toDouble(),
+              min: eighths / 2,
+              max: 12.0 * eighths,
+              divisions: 12 * eighths - eighths ~/ 2,
+              label: cellCount(value),
+              semanticFormatterCallback: (v) =>
+                  '$name ${cellCount(v.round())} cells',
+              onChanged: (v) => onChanged(v.round()),
+            ),
+          ),
+        ],
+      );
   late String? _look = widget.button?.style;
   late String? _show = widget.button?.show;
   late String? _image = widget.button?.image;
@@ -276,11 +305,11 @@ class _ButtonEditorState extends State<ButtonEditor> {
       action: action,
       icon: widgetTile ? null : _icon,
       color: widgetTile ? null : _color,
-      // The place stays; the size is in cells (1 by 1 needs no saying).
-      x: widget.button?.x,
-      y: widget.button?.y,
-      w: _cells == (1, 1) ? null : _cells.$1,
-      h: _cells == (1, 1) ? null : _cells.$2,
+      // The place stays, now in eighths; one cell needs no saying.
+      left: widget.button?.fine.left,
+      top: widget.button?.fine.top,
+      width: _fine == _normal ? null : _fine.$1,
+      height: _fine == _normal ? null : _fine.$2,
       style: plain ? null : _look,
       show: plain ? null : _show,
       image: plain ? null : _image,
@@ -424,8 +453,8 @@ class _ButtonEditorState extends State<ButtonEditor> {
                       onSelect: (picked) => setState(() {
                         _widget = picked ?? _widget;
                         // Music reads best wide; pick another shape any time.
-                        if (_widget == 'music' && _cells == (1, 1)) {
-                          _cells = (3, 1);
+                        if (_widget == 'music' && _fine == _normal) {
+                          _fine = (3 * eighths, eighths);
                         }
                       }),
                     ),
@@ -522,12 +551,30 @@ class _ButtonEditorState extends State<ButtonEditor> {
                 ),
               OptionChips(
                 title: _shape == 'custom'
-                    ? 'Shape (now a custom ${_cells.$1} by ${_cells.$2})'
+                    ? 'Shape (now a custom '
+                          '${cellCount(_fine.$1)} × ${cellCount(_fine.$2)})'
                     : 'Shape',
                 choices: buttonSizes,
                 selected: _shape,
-                onSelect: (shape) =>
-                    setState(() => _cells = shapeSpans[shape] ?? (1, 1)),
+                onSelect: (shape) => setState(
+                  () => _fine = switch (shapeSpans[shape]) {
+                    (final wide, final tall)? => (
+                      wide * eighths,
+                      tall * eighths,
+                    ),
+                    null => _normal,
+                  },
+                ),
+              ),
+              _sizeSlider(
+                'Width',
+                _fine.$1,
+                (width) => setState(() => _fine = (width, _fine.$2)),
+              ),
+              _sizeSlider(
+                'Height',
+                _fine.$2,
+                (height) => setState(() => _fine = (_fine.$1, height)),
               ),
               if (_kind != 'stat' && _kind != 'widget') ...[
                 OptionChips(

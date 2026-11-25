@@ -179,6 +179,10 @@ class DeckButton {
     this.y,
     this.w,
     this.h,
+    this.left,
+    this.top,
+    this.width,
+    this.height,
   });
 
   final String id;
@@ -201,10 +205,39 @@ class DeckButton {
   final int? w;
   final int? h;
 
-  /// The button's size in cells (wide, tall): its own, or from its shape.
+  /// Where the button sits and how big it is in eighths of a cell, when
+  /// placed or sized by hand (see [fine]).
+  final int? left;
+  final int? top;
+  final int? width;
+  final int? height;
+
+  /// The button's size in whole cells (wide, tall), from its shape or cells.
   (int, int) get span {
     final shape = shapeSpans[size];
     return (w ?? shape?.$1 ?? 1, h ?? shape?.$2 ?? 1);
+  }
+
+  /// Where the button sits (null when the grid picks) and its size, in
+  /// eighths of a cell. Places saved in whole cells read the same way.
+  ({int? left, int? top, int width, int height}) get fine {
+    final (wide, tall) = span;
+    return (
+      left:
+          left ??
+          switch (x) {
+            final x? => x * eighths,
+            null => null,
+          },
+      top:
+          top ??
+          switch (y) {
+            final y? => y * eighths,
+            null => null,
+          },
+      width: width ?? wide * eighths,
+      height: height ?? tall * eighths,
+    );
   }
 
   Map<String, Object> toJson() => {
@@ -221,19 +254,28 @@ class DeckButton {
     'y': ?y,
     'w': ?w,
     'h': ?h,
+    'left': ?left,
+    'top': ?top,
+    'width': ?width,
+    'height': ?height,
   };
 
   DeckButton _withAction(ButtonAction action) => _copy(action: action);
 
-  DeckButton _copy({String? id, ButtonAction? action, CellPlace? place}) =>
+  /// A copy; a new [place] replaces any place in whole cells.
+  DeckButton _copy({String? id, ButtonAction? action, FinePlace? place}) =>
       DeckButton(
         id: id ?? this.id,
         label: label,
         action: action ?? this.action,
-        x: place?.x ?? x,
-        y: place?.y ?? y,
-        w: place?.w ?? w,
-        h: place?.h ?? h,
+        x: place == null ? x : null,
+        y: place == null ? y : null,
+        w: place == null ? w : null,
+        h: place == null ? h : null,
+        left: place?.left ?? left,
+        top: place?.top ?? top,
+        width: place?.width ?? width,
+        height: place?.height ?? height,
         icon: icon,
         color: color,
         size: size,
@@ -265,6 +307,10 @@ class DeckButton {
           y: _whole(map['y']),
           w: _whole(map['w']),
           h: _whole(map['h']),
+          left: _whole(map['left']),
+          top: _whole(map['top']),
+          width: _whole(map['width']),
+          height: _whole(map['height']),
         );
       }
     }
@@ -366,8 +412,11 @@ String? _text(Object? value) => value is String ? value : null;
 
 int? _whole(Object? value) => value is int ? value : null;
 
-/// Where a button sits and how big it is, in cells.
-typedef CellPlace = ({int x, int y, int w, int h});
+/// Fine places and sizes count in eighths of a cell, like on the PC.
+const eighths = 8;
+
+/// Where a button sits and how big it is, in eighths of a cell.
+typedef FinePlace = ({int left, int top, int width, int height});
 
 /// The size in cells (wide, tall) of each shape name.
 const shapeSpans = {
@@ -479,7 +528,7 @@ class Deck {
   );
 
   /// Puts buttons where [places] say, by id, on pages and in folders.
-  Deck withPlaces(Map<String, CellPlace> places) => _editLists(
+  Deck withPlaces(Map<String, FinePlace> places) => _editLists(
     (list) => [
       for (final b in list)
         if (places[b.id] case final place?) b._copy(place: place) else b,

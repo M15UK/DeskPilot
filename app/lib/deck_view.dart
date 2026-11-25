@@ -156,10 +156,15 @@ class DeckView extends StatelessWidget {
       ),
       editing: editing,
       tiles: [
-        if (open != null) (w: 1, h: 1, x: null, y: null),
+        if (open != null) (w: eighths, h: eighths, x: null, y: null),
         for (final button in buttons)
-          (w: button.span.$1, h: button.span.$2, x: button.x, y: button.y),
-        if (adding) (w: 1, h: 1, x: null, y: null),
+          (
+            w: button.fine.width,
+            h: button.fine.height,
+            x: button.fine.left,
+            y: button.fine.top,
+          ),
+        if (adding) (w: eighths, h: eighths, x: null, y: null),
       ],
       // The Back and Add button tiles stay where the grid puts them.
       movable: {
@@ -172,10 +177,10 @@ class DeckView extends StatelessWidget {
           for (final (index, button) in buttons.indexed)
             if (places[index + (open == null ? 0 : 1)] case final place)
               button.id: (
-                x: place.column,
-                y: place.row,
-                w: place.width,
-                h: place.height,
+                left: place.column,
+                top: place.row,
+                width: place.width,
+                height: place.height,
               ),
         }),
       ),

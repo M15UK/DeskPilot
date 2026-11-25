@@ -3,55 +3,61 @@ import 'dart:math';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-/// Where a tile sits in the grid, in cells.
+/// Places and sizes count in eighths of a cell, so a tile can have nearly
+/// any size (like `eighths` in the deck).
+const _parts = 8;
+
+/// The smallest tile is half a cell; the biggest twelve cells across.
+const _minSize = _parts ~/ 2;
+const _maxSize = 12 * _parts;
+
+/// Where a tile sits and how big it is, in eighths of a cell.
 typedef TilePlace = ({int column, int row, int width, int height});
 
-/// A tile to lay out: its size in cells, and the cell of its top left corner
+/// A tile to lay out, in eighths of a cell: its size, and its top left corner
 /// when it was placed by hand.
 typedef TileSpec = ({int w, int h, int? x, int? y});
 
-/// The most cells a tile can grow to, like DeckButton.MaxSpan on the PC.
-const _maxSpan = 12;
+/// A size in eighths as cells: 1, 1.5, 2.13.
+String cellCount(int parts) {
+  final cells = parts / _parts;
+  return cells == cells.roundToDouble()
+      ? '${cells.round()}'
+      : cells.toStringAsFixed(2).replaceFirst(RegExp(r'0$'), '');
+}
 
-/// Places tiles in a grid [columns] wide. Tiles placed by hand go where they
-/// were put, when that fits and is free; every other tile then takes the first
-/// free spot, reading left to right and top to bottom. A tile wider than the
-/// grid is narrowed to fit.
+bool _overlaps(TilePlace a, TilePlace b) =>
+    a.column < b.column + b.width &&
+    b.column < a.column + a.width &&
+    a.row < b.row + b.height &&
+    b.row < a.row + a.height;
+
+/// Places tiles in a grid [columns] cells wide. Tiles placed by hand go where
+/// they were put, when that fits and is free; every other tile then takes the
+/// first free whole cell that fits it, reading left to right and top to
+/// bottom. A tile wider than the grid is narrowed to fit.
 List<TilePlace> placeTiles(List<TileSpec> tiles, int columns) {
-  final taken = <(int, int)>{};
-  bool free(int column, int row, int width, int height) {
-    for (var x = column; x < column + width; x++) {
-      for (var y = row; y < row + height; y++) {
-        if (taken.contains((x, y))) return false;
-      }
-    }
-    return true;
-  }
-
-  TilePlace take(int column, int row, int width, int height) {
-    for (var x = column; x < column + width; x++) {
-      for (var y = row; y < row + height; y++) {
-        taken.add((x, y));
-      }
-    }
-    return (column: column, row: row, width: width, height: height);
-  }
+  final across = columns * _parts;
+  final taken = <TilePlace>[];
+  bool free(TilePlace place) => !taken.any((other) => _overlaps(place, other));
 
   final places = List<TilePlace?>.filled(tiles.length, null);
   for (final (index, tile) in tiles.indexed) {
     if (tile case (:final w, :final h, x: final x?, y: final y?)
-        when x + w <= columns && free(x, y, w, h)) {
-      places[index] = take(x, y, w, h);
+        when x + w <= across) {
+      final place = (column: x, row: y, width: w, height: h);
+      if (free(place)) taken.add(places[index] = place);
     }
   }
   for (final (index, tile) in tiles.indexed) {
     if (places[index] != null) continue;
-    final width = min(tile.w, columns);
+    final width = min(tile.w, across);
     search:
-    for (var row = 0; ; row++) {
-      for (var column = 0; column + width <= columns; column++) {
-        if (free(column, row, width, tile.h)) {
-          places[index] = take(column, row, width, tile.h);
+    for (var row = 0; ; row += _parts) {
+      for (var column = 0; column + width <= across; column += _parts) {
+        final place = (column: column, row: row, width: width, height: tile.h);
+        if (free(place)) {
+          taken.add(places[index] = place);
           break search;
         }
       }
@@ -107,49 +113,41 @@ class _TileGridState extends State<TileGrid> {
         _blocked = false;
       });
 
-  /// Follows the finger: where the tile would land, and whether it's free.
+  /// Follows the finger in eighths of a cell ([step] pixels each): where the
+  /// tile would land or how big it would be, and whether that's free.
   void _follow(Offset drag, List<TilePlace> places, int columns, double step) {
     final index = _active;
     if (index == null) return;
     final place = places[index];
-    final TilePlace next;
-    if (_resizing) {
-      final width = (place.width + drag.dx / step).round();
-      final height = (place.height + drag.dy / step).round();
-      next = (
-        column: place.column,
-        row: place.row,
-        width: width.clamp(1, min(_maxSpan, columns - place.column)),
-        height: height.clamp(1, _maxSpan),
-      );
-    } else {
-      final column = ((place.column * step + drag.dx) / step).round();
-      final row = ((place.row * step + drag.dy) / step).round();
-      next = (
-        column: column.clamp(0, columns - place.width),
-        row: max(0, row),
-        width: place.width,
-        height: place.height,
-      );
-    }
+    final across = columns * _parts;
+    final moved = (x: (drag.dx / step).round(), y: (drag.dy / step).round());
+    final TilePlace next = _resizing
+        ? (
+            column: place.column,
+            row: place.row,
+            width: (place.width + moved.x).clamp(
+              _minSize,
+              max(_minSize, min(_maxSize, across - place.column)),
+            ),
+            height: (place.height + moved.y).clamp(_minSize, _maxSize),
+          )
+        : (
+            column: (place.column + moved.x).clamp(
+              0,
+              max(0, across - place.width),
+            ),
+            row: max(0, place.row + moved.y),
+            width: place.width,
+            height: place.height,
+          );
     setState(() {
       _drag = drag;
       _preview = next;
-      _blocked = _overlaps(next, places, index);
+      _blocked = [
+        for (final (i, other) in places.indexed)
+          if (i != index) other,
+      ].any((other) => _overlaps(next, other));
     });
-  }
-
-  static bool _overlaps(TilePlace place, List<TilePlace> places, int except) {
-    for (final (index, other) in places.indexed) {
-      if (index == except) continue;
-      if (place.column < other.column + other.width &&
-          other.column < place.column + place.width &&
-          place.row < other.row + other.height &&
-          other.row < place.row + place.height) {
-        return true;
-      }
-    }
-    return false;
   }
 
   void _finish(List<TilePlace> places) {
@@ -176,15 +174,16 @@ class _TileGridState extends State<TileGrid> {
       // Like GridView.extent: cells are at most [cell] wide.
       final columns = max(1, ((width + gap) / (widget.cell + gap)).ceil());
       final unit = (width - gap * (columns - 1)) / columns;
-      final step = unit + gap;
+      // A cell plus its gap, and an eighth of that: one step of a tile.
+      final step = (unit + gap) / _parts;
       final places = placeTiles(widget.tiles, columns);
-      double length(int cells) => cells * unit + (cells - 1) * gap;
+      double length(int parts) => parts * step - gap;
 
       final preview = _preview;
       var rows = places.fold(0, (most, p) => max(most, p.row + p.height));
       if (preview != null) rows = max(rows, preview.row + preview.height);
       // Room below the tiles to drag them into.
-      if (widget.editing) rows += 2;
+      if (widget.editing) rows += 2 * _parts;
 
       Widget placed(int index) {
         final place = places[index];
@@ -246,6 +245,36 @@ class _TileGridState extends State<TileGrid> {
                   ),
                 ),
               for (final index in order) placed(index),
+              if (preview != null && _resizing && _active != null)
+                Positioned(
+                  left: preview.column * step,
+                  top: preview.row * step,
+                  width: length(preview.width),
+                  height: length(preview.height),
+                  child: IgnorePointer(
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xCC000000),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${cellCount(preview.width)} × '
+                          '${cellCount(preview.height)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

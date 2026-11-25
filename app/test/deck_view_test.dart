@@ -293,10 +293,10 @@ void main() {
     await drag.up();
     await tester.pumpAndSettle();
 
-    final first = changed!.find('a')!;
-    final second = changed!.find('b')!;
-    expect((first.x, first.y), (0, 0), reason: 'pinned where it was');
-    expect(second.y, 1, reason: 'one row down');
+    final first = changed!.find('a')!.fine;
+    final second = changed!.find('b')!.fine;
+    expect((first.left, first.top), (0, 0), reason: 'pinned where it was');
+    expect((second.left, second.top), (8, 8), reason: 'one cell down');
   });
 
   testWidgets('a button can be wide, solid and show only its icon', (
@@ -315,7 +315,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final saved = changed!.pages[0].buttons.single;
-    expect((saved.span, saved.style, saved.show), ((2, 1), 'solid', 'icon'));
+    expect(
+      (saved.fine.width, saved.fine.height, saved.style, saved.show),
+      (16, 8, 'solid', 'icon'),
+    );
   });
 
   testWidgets('a size made by hand shows as custom, and a shape resets it', (
@@ -341,14 +344,35 @@ void main() {
 
     await tester.tap(find.text('Stretched'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Shape (now a custom 4 by 2)'));
+    await tester.ensureVisible(find.text('Shape (now a custom 4 × 2)'));
     await tester.tap(find.text('Normal'));
     await tester.pump();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
     final saved = changed!.pages[0].buttons.single;
-    expect((saved.span, saved.x, saved.y), ((1, 1), 1, 0));
+    final fine = saved.fine;
+    expect((fine.width, fine.height, fine.left, fine.top), (8, 8, 8, 0));
+    expect(saved.x, isNull, reason: 'now saved in eighths');
+  });
+
+  testWidgets('the width slider sets any size, not just whole cells', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(editing: true));
+
+    await tester.tap(find.text('Play / Pause'));
+    await tester.pumpAndSettle();
+    final width = find.byType(Slider).first;
+    await tester.ensureVisible(width);
+    await tester.drag(width, const Offset(60, 0));
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final saved = changed!.pages[0].buttons.single.fine;
+    expect(saved.width, greaterThan(8));
+    expect(saved.height, 8);
   });
 
   testWidgets('an icon only button still says its name to screen readers', (

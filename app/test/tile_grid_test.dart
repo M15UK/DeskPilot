@@ -3,12 +3,14 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-TileSpec free(int w, int h) => (w: w, h: h, x: null, y: null);
+// Tests think in whole cells; the grid counts eighths of a cell.
+TileSpec free(int w, int h) => (w: w * 8, h: h * 8, x: null, y: null);
 
-TileSpec at(int x, int y, [int w = 1, int h = 1]) => (w: w, h: h, x: x, y: y);
+TileSpec at(int x, int y, [int w = 1, int h = 1]) =>
+    (w: w * 8, h: h * 8, x: x * 8, y: y * 8);
 
 List<(int, int)> cells(List<TilePlace> places) => [
-  for (final p in places) (p.column, p.row),
+  for (final p in places) (p.column ~/ 8, p.row ~/ 8),
 ];
 
 void main() {
@@ -27,7 +29,7 @@ void main() {
   test('a tile wider than the grid is made to fit', () {
     final places = placeTiles([free(2, 1)], 1);
 
-    expect((places.single.width, places.single.height), (1, 1));
+    expect((places.single.width, places.single.height), (8, 8));
   });
 
   test('a tile placed by hand stays put, and the rest fill around it', () {
@@ -132,7 +134,39 @@ void main() {
       await drag.up();
       await tester.pump();
 
-      expect((placed!.single.width, placed!.single.height), (2, 3));
+      // 12.5 pixels an eighth: 110 is about 9 more, 210 about 17 more.
+      expect((placed!.single.width, placed!.single.height), (17, 25));
+      expect(find.text('2.13 × 3.13'), findsNothing, reason: 'label gone');
+    });
+
+    testWidgets('shows the size while resizing', (tester) async {
+      await tester.pumpWidget(grid([free(1, 1)]));
+
+      final drag = await tester.startGesture(
+        tester.getCenter(find.byIcon(Icons.open_in_full_rounded)),
+      );
+      await drag.moveBy(const Offset(50, 0));
+      await tester.pump();
+
+      expect(find.text('1.5 × 1'), findsOneWidget);
+      await drag.up();
+    });
+
+    testWidgets('a tile moves in small steps, not only whole cells', (
+      tester,
+    ) async {
+      await tester.pumpWidget(grid([free(1, 1)]));
+
+      final drag = await tester.startGesture(
+        tester.getCenter(find.text('tile 0')),
+      );
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+      await drag.moveBy(const Offset(30, 40));
+      await tester.pump();
+      await drag.up();
+      await tester.pump();
+
+      expect((placed!.single.column, placed!.single.row), (2, 3));
     });
   });
 }

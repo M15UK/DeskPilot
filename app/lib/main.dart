@@ -506,6 +506,10 @@ class _DeckPageState extends State<DeckPage> {
         // Full screen keeps quiet while all is well.
         if (agent == null || !widget.settings.fullScreen)
           Text(_status, textAlign: TextAlign.center),
+        if (agent != null && agent.pcIsOutOfDate) ...[
+          const SizedBox(height: 8),
+          const _OutOfDatePc(),
+        ],
         if (agent == null && !_busy) ...[
           const SizedBox(height: 12),
           OutlinedButton(
@@ -556,6 +560,38 @@ class _DeckPageState extends State<DeckPage> {
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// Says that DeskPilot on the PC needs updating, so changes don't quietly
+/// jump back when the PC drops what it doesn't know yet.
+class _OutOfDatePc extends StatelessWidget {
+  const _OutOfDatePc();
+
+  @override
+  Widget build(BuildContext context) {
+    final amber = deckColors['amber']!;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: amber.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: amber.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        spacing: 10,
+        children: [
+          Icon(Icons.system_update_alt_rounded, color: amber),
+          const Expanded(
+            child: Text(
+              'DeskPilot on your PC is older than this app, so moves and '
+              'sizes jump back. Update it on the PC: git pull, then restart '
+              'DeskPilot.',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

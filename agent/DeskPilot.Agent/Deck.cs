@@ -38,9 +38,10 @@ public sealed record StatAction(string Stat, string Style) : ButtonAction
 /// of <see cref="Sizes"/>: two places wide, two tall, or both. Left out, the button takes one place.
 /// <paramref name="Style"/> is one of <see cref="Styles"/> (left out: tinted), and <paramref name="Show"/> one of
 /// <see cref="Shows"/> (left out: icon and label). <paramref name="Image"/> is the id of a picture in the
-/// <see cref="ImageStore"/>, shown instead of the icon. <paramref name="X"/> and <paramref name="Y"/> are the cell of
-/// its top left corner, and <paramref name="W"/> and <paramref name="H"/> its size in cells, when it was placed by
-/// hand.
+/// <see cref="ImageStore"/>, shown instead of the icon. <paramref name="Left"/>, <paramref name="Top"/>,
+/// <paramref name="Width"/> and <paramref name="Height"/> are where it sits and how big it is in eighths of a cell, when
+/// placed by hand. <paramref name="X"/>, <paramref name="Y"/>, <paramref name="W"/> and <paramref name="H"/> are the
+/// same in whole cells, as older phones saved them.
 /// </summary>
 /// <summary>A button that opens more buttons on the phone, with a way back. Folders don't hold folders.</summary>
 public sealed record FolderAction(IReadOnlyList<DeckButton> Buttons) : ButtonAction;
@@ -70,8 +71,18 @@ public sealed record DeckButton(
     int? X = null,
     int? Y = null,
     int? W = null,
-    int? H = null)
+    int? H = null,
+    int? Left = null,
+    int? Top = null,
+    int? Width = null,
+    int? Height = null)
 {
+    /// <summary>Fine places and sizes count in eighths of a cell, so a tile can have nearly any size.</summary>
+    public const int Eighths = 8;
+
+    /// <summary>The smallest tile is half a cell.</summary>
+    public const int MinFine = Eighths / 2;
+
     /// <summary>The grid is up to this many cells wide; a phone shows fewer and moves what doesn't fit.</summary>
     public const int MaxColumns = 16;
     public const int MaxRows = 200;
@@ -83,7 +94,12 @@ public sealed record DeckButton(
         && Y is null or (>= 0 and < MaxRows)
         && W is null or (>= 1 and <= MaxSpan)
         && H is null or (>= 1 and <= MaxSpan)
-        && (X ?? 0) + (W ?? 1) <= MaxColumns;
+        && (X ?? 0) + (W ?? 1) <= MaxColumns
+        && Left is null or (>= 0 and < MaxColumns * Eighths)
+        && Top is null or (>= 0 and < MaxRows * Eighths)
+        && Width is null or (>= MinFine and <= MaxSpan * Eighths)
+        && Height is null or (>= MinFine and <= MaxSpan * Eighths)
+        && (Left ?? 0) + (Width ?? Eighths) <= MaxColumns * Eighths;
 
     public static readonly FrozenSet<string> Styles = new[] { "solid", "outline" }.ToFrozenSet();
 

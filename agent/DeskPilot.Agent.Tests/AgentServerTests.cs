@@ -186,7 +186,7 @@ public class ServerTests : IAsyncLifetime
             using var hello = await ReceiveJsonAsync(phone);
             Assert.Equal("hello", Type(hello));
             Assert.Equal(Environment.MachineName, hello.RootElement.GetProperty("name").GetString());
-            Assert.Equal(5, hello.RootElement.GetProperty("version").GetInt32());
+            Assert.Equal(6, hello.RootElement.GetProperty("version").GetInt32());
             using var deck = await ReceiveJsonAsync(phone);
             Assert.Equal("deck", Type(deck));
         }

@@ -31,7 +31,7 @@ The PC answers:
 | Message | When |
 | :-- | :-- |
 | `{"type":"paired","key":"..."}` | The code was right. The phone keeps this 256 bit key in its secure storage. The PC keeps only its SHA-256 hash. |
-| `{"type":"hello","name":"GAMING-PC","version":5}` | The phone is signed in. The deck follows right after. |
+| `{"type":"hello","name":"GAMING-PC","version":6}` | The phone is signed in. The deck follows right after. A phone that needs a newer PC (6 added places and sizes in eighths of a cell) asks you to update DeskPilot on the PC. The pairing QR code keeps its own version, 5. |
 | `{"type":"error","message":"..."}`, then close code 1008 | The code or key is wrong. The app shows `message`. |
 
 ## After signing in
@@ -86,6 +86,6 @@ characters. Button ids are unique across the deck, up to 64 characters. A button
 of up to 40 lowercase letters, digits and `_`, from the app's icon set) and a `color` (`red`, `amber`,
 `green`, `teal`, `blue`, `purple`, `pink` or `gray`). Without them the app picks both from what the button
 does. It may also have a `size` (`wide` 2×1, `tall` 1×2, `big` 2×2, `wider` 3×1 or `huge` 3×2; left out it takes one place), a `style` (`solid`
-or `outline`; left out it is tinted) a `show` (`icon` or `name`; left out it shows both), and an `image` (a picture id, shown instead of the icon). A button placed or sized by hand has `x` and `y` (the cell of its top left corner, 0 to 15 and 0 to 199) and `w` and `h` (its size in cells, 1 to 12, with `x` + `w` at most 16); these win over `size`. A phone narrower than a placed button moves it to the first free spot. A page may
+or `outline`; left out it is tinted) a `show` (`icon` or `name`; left out it shows both), and an `image` (a picture id, shown instead of the icon). A button placed or sized by hand has `left` and `top` (its top left corner) and `width` and `height` (its size), all in eighths of a cell: `left` 0 to 127, `top` 0 to 1599, sizes 4 (half a cell) to 96 (twelve cells), with `left` + `width` at most 128. These win over `size`. Older phones saved `x`, `y`, `w` and `h` in whole cells (`x` + `w` at most 16); they still work and read as eighths. A phone narrower than a placed button moves it to the first free spot. A page may
 have a `size` for its buttons (`small`, `medium`, `large` or `huge`), an `icon` for the page rail, and a
 `background` color, and a `wallpaper` (a picture id) behind its buttons.

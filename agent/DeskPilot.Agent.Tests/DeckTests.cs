@@ -157,6 +157,32 @@ public class DeckTests
         Assert.Equal(json, Json(deck!));
     }
 
+    [Fact]
+    public void AButtonCanHaveAnySizeInEighthsOfACell()
+    {
+        const string json =
+            """{"pages":[{"name":"Home","buttons":[""" +
+            """{"id":"c","label":"Clock","action":{"kind":"clock"},"left":3,"top":20,"width":21,"height":10}""" +
+            """]}]}""";
+
+        var deck = Deck.Read(JsonDocument.Parse(json).RootElement, out var problem);
+
+        Assert.Null(problem);
+        Assert.Equal(json, Json(deck!));
+    }
+
+    [Theory]
+    [InlineData("\"left\":-1,\"top\":0")]
+    [InlineData("\"width\":2,\"height\":8")]
+    [InlineData("\"width\":97,\"height\":8")]
+    [InlineData("\"left\":100,\"width\":40")]
+    public void AFinePlaceOffTheGridIsRefused(string place)
+    {
+        var json = $$"""{"pages":[{"name":"Main","buttons":[{"id":"a","label":"A","action":{"kind":"media","media":"next"},{{place}}}]}]}""";
+
+        Assert.Null(Deck.Read(JsonDocument.Parse(json).RootElement, out _));
+    }
+
     [Theory]
     [InlineData("\"x\":-1,\"y\":0")]
     [InlineData("\"x\":0,\"y\":500")]

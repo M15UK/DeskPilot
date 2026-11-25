@@ -24,7 +24,20 @@ class AgentRefused implements Exception {
 /// A signed in, encrypted connection to DeskPilot on a PC.
 /// The messages are described in docs/PROTOCOL.md.
 class AgentConnection {
-  AgentConnection._(this._socket, this._messages, this.pcName, this.key);
+  AgentConnection._(
+    this._socket,
+    this._messages,
+    this.pcName,
+    this.key,
+    this.pcVersion,
+  );
+
+  /// The version the PC says in hello (0 when it doesn't say).
+  final int pcVersion;
+
+  /// True when DeskPilot on the PC is older than this app, so it may drop
+  /// things this app saves, like places and sizes made by hand.
+  bool get pcIsOutOfDate => pcVersion < neededPcVersion;
 
   final WebSocket _socket;
   final StreamIterator<dynamic> _messages;
@@ -57,7 +70,10 @@ class AgentConnection {
       }
       return switch (reply) {
         {'type': 'hello', 'name': final String name} when key != null =>
-          AgentConnection._(socket, messages, name, key),
+          AgentConnection._(socket, messages, name, key, switch (reply) {
+            {'version': final int version} => version,
+            _ => 0,
+          }),
         {'type': 'error', 'message': final String message} =>
           throw AgentRefused(message),
         _ => throw const AgentRefused('The PC sent something unexpected.'),
@@ -141,6 +157,10 @@ class AgentConnection {
 
   Future<void> close() => _socket.close();
 }
+
+/// The PC version this app needs: 6 keeps places and sizes in eighths of a
+/// cell (AgentServer.ProtocolVersion on the PC).
+const neededPcVersion = 6;
 
 /// Something the PC sent after signing in.
 sealed class AgentEvent {

@@ -161,8 +161,8 @@ If a tile stays empty, the DeskPilot window says why. Two checks help:
 
 Until a tool is ready, its tile shows a dash and the DeskPilot window says what is missing.
 
-To run the tests, use `dotnet test agent/DeskPilot.slnx` (135 tests) and `flutter test` in the app
-folder (87 tests).
+To run the tests, use `dotnet test agent/DeskPilot.slnx` (140 tests) and `flutter test` in the app
+folder (93 tests).
 
 ## Limits
 

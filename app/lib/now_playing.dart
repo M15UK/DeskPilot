@@ -150,6 +150,8 @@ class NowPlayingCard extends StatelessWidget {
             onKey: onKey,
             tint: tint,
             cover: (size.maxHeight - 24).clamp(56, 180).toDouble(),
+            // A one row tile has no room for the "Playing on" line.
+            roomy: size.maxHeight >= 200,
           ),
         },
       ),
@@ -228,12 +230,14 @@ class _Wide extends StatelessWidget {
     required this.onKey,
     required this.tint,
     required this.cover,
+    required this.roomy,
   });
 
   final NowPlaying media;
   final ValueChanged<String>? onKey;
   final Color tint;
   final double cover;
+  final bool roomy;
 
   @override
   Widget build(BuildContext context) {
@@ -256,13 +260,15 @@ class _Wide extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  'Playing on your PC, ${media.app}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: look.muted, fontSize: 11),
-                ),
-                const SizedBox(height: 2),
+                if (roomy) ...[
+                  Text(
+                    'Playing on your PC, ${media.app}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: look.muted, fontSize: 11),
+                  ),
+                  const SizedBox(height: 2),
+                ],
                 Text(
                   media.title,
                   maxLines: 1,
@@ -274,7 +280,7 @@ class _Wide extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  media.artist,
+                  roomy ? media.artist : '${media.artist}, on ${media.app}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: soft, fontSize: 13),
@@ -309,12 +315,14 @@ class _Wide extends StatelessWidget {
                     children: [
                       IconButton(
                         tooltip: 'Previous',
+                        visualDensity: VisualDensity.compact,
                         color: soft,
                         onPressed: key == null ? null : () => key('previous'),
                         icon: const Icon(Icons.skip_previous_rounded),
                       ),
                       IconButton.filled(
                         tooltip: media.playing ? 'Pause' : 'Play',
+                        visualDensity: VisualDensity.compact,
                         style: IconButton.styleFrom(
                           backgroundColor: look.text,
                           foregroundColor: tint,
@@ -328,6 +336,7 @@ class _Wide extends StatelessWidget {
                       ),
                       IconButton(
                         tooltip: 'Next',
+                        visualDensity: VisualDensity.compact,
                         color: soft,
                         onPressed: key == null ? null : () => key('next'),
                         icon: const Icon(Icons.skip_next_rounded),

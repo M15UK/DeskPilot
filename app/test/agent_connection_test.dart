@@ -9,6 +9,9 @@ import 'fake_pc.dart';
 
 const hello = {'type': 'hello', 'name': 'GAMING-PC', 'version': 5};
 
+// What a PC on the current DeskPilot says.
+const currentHello = {'type': 'hello', 'name': 'GAMING-PC', 'version': 6};
+
 void main() {
   FakePc? pc;
   tearDown(() => pc?.stop());
@@ -61,6 +64,19 @@ void main() {
 
     expect(agent.key, 'saved-key');
     expect(await fake.nextMessage(), {'type': 'auth', 'key': 'saved-key'});
+    expect(agent.pcIsOutOfDate, isTrue, reason: 'this PC says version 5');
+  });
+
+  test('a PC on the current DeskPilot is up to date', () async {
+    final fake = pc = await FakePc.start((_) => [currentHello]);
+
+    final agent = await AgentConnection.signIn((
+      pc: infoFor(fake),
+      key: 'saved-key',
+    ));
+    addTearDown(agent.close);
+
+    expect(agent.pcIsOutOfDate, isFalse);
   });
 
   test('shows why the PC refused', () async {

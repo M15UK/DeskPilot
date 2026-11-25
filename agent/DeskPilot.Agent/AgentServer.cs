@@ -26,7 +26,11 @@ public static class AgentServer
     public const int DefaultPort = 8740;
     public const int MaxSignInBytes = 4096;
     public const int MaxMessageBytes = 1024 * 1024;
-    public const int ProtocolVersion = 5;
+    /// <summary>
+    /// Sent in hello, so a phone can tell when the PC is older than it is: 6 added places and sizes in eighths of a
+    /// cell. The pairing QR code has its own version, <see cref="PairingQr.Version"/>.
+    /// </summary>
+    public const int ProtocolVersion = 6;
 
     public static WebApplication Create(int port, AgentServices services)
     {

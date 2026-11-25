@@ -236,16 +236,44 @@ void main() {
     expect(wide.span, (3, 2));
   });
 
-  test('places buttons by hand, in folders too', () {
+  test('places buttons by hand at any size, in eighths of a cell', () {
     final deck = sample().withPlaces({
-      'pit': (x: 3, y: 1, w: 2, h: 2),
-      'cpu': (x: 0, y: 0, w: 1, h: 1),
+      'pit': (left: 3, top: 20, width: 21, height: 10),
+      'cpu': (left: 0, top: 0, width: 8, height: 8),
     });
 
-    final pit = deck.find('pit')!;
-    expect((pit.x, pit.y, pit.span), (3, 1, (2, 2)));
-    expect(deck.find('cpu')!.x, 0);
-    expect(deck.find('ac')!.x, isNull, reason: 'not moved');
+    final pit = deck.find('pit')!.fine;
+    expect((pit.left, pit.top, pit.width, pit.height), (3, 20, 21, 10));
+    expect(deck.find('cpu')!.fine.left, 0);
+    expect(deck.find('ac')!.fine.left, isNull, reason: 'not moved');
+  });
+
+  test(
+    'a place in whole cells, as older phones saved it, reads in eighths',
+    () {
+      const old = DeckButton(
+        id: 'o',
+        label: 'Old',
+        action: MediaAction('next'),
+        x: 2,
+        y: 1,
+        w: 3,
+        h: 2,
+      );
+
+      final fine = old.fine;
+      expect((fine.left, fine.top, fine.width, fine.height), (16, 8, 24, 16));
+    },
+  );
+
+  test('a fine place reads back from the PC the same', () {
+    // The same text as AButtonCanHaveAnySizeInEighthsOfACell on the PC.
+    const json =
+        '{"pages":[{"name":"Home","buttons":['
+        '{"id":"c","label":"Clock","action":{"kind":"clock"},"left":3,"top":20,"width":21,"height":10}'
+        ']}]}';
+
+    expect(jsonEncode(Deck.fromJson(jsonDecode(json))!.toJson()), json);
   });
 
   test('new button ids are unique', () {
