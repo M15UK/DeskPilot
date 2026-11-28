@@ -541,16 +541,22 @@ class _PhotosTileState extends State<PhotosTile> {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: pictures.isEmpty
-          ? Center(
+          ? Padding(
+              padding: const EdgeInsets.all(8),
+              // Fits any tile, down to half a cell.
               child: Column(
-                mainAxisSize: MainAxisSize.min,
-                spacing: 6,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.photo_library_rounded, color: look.muted),
-                  Text(
-                    'Add photos in edit mode',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: look.muted, fontSize: 12),
+                  const SizedBox(height: 6),
+                  Flexible(
+                    child: Text(
+                      'Add photos in edit mode',
+                      textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: look.muted, fontSize: 12),
+                    ),
                   ),
                 ],
               ),

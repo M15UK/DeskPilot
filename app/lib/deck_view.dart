@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:deskpilot/action_picker.dart';
 import 'package:deskpilot/deck.dart';
 import 'package:deskpilot/editor.dart';
 import 'package:deskpilot/look.dart';
@@ -367,12 +368,40 @@ class DeckView extends StatelessWidget {
     ),
   );
 
+  /// Edits [button], or adds a new one: first pick what it does from the
+  /// actions list, then settings only when it needs some.
   Future<void> _editButton(BuildContext context, DeckButton? button) async {
     final open = _openFolder;
+    PickedAction? picked;
+    if (button == null) {
+      picked = await showDialog<PickedAction>(
+        context: context,
+        builder: (_) => ActionPicker(canBeFolder: open == null),
+      );
+      if (picked == null || !context.mounted) return;
+      if (!picked.needsSettings) {
+        final cells = picked.cells;
+        final added = DeckButton(
+          id: newButtonId(),
+          label: autoLabel(picked.action),
+          action: picked.action,
+          width: cells == null ? null : cells.$1 * eighths,
+          height: cells == null ? null : cells.$2 * eighths,
+        );
+        onChange(
+          open == null
+              ? deck.withButton(page, added)
+              : deck.withButtonInFolder(open.id, added),
+        );
+        return;
+      }
+    }
     final edit = await showDialog<ButtonEdit>(
       context: context,
       builder: (_) => ButtonEditor(
         button: button,
+        start: picked?.action,
+        startCells: picked?.cells,
         canBeFolder: open == null,
         pictures: pictures,
         pickPicture: pickPicture,
@@ -386,8 +415,6 @@ class DeckView extends StatelessWidget {
         onChange(deck.withButton(page, saved));
       case DeleteButton(:final id):
         onChange(deck.withoutButton(id));
-      case MoveButton(:final id, :final by):
-        onChange(deck.movedButton(id, by));
       case OpenFolder(:final id):
         onFolderChanged?.call(id);
       case null:

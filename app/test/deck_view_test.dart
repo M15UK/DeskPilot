@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:deskpilot/deck.dart';
+import 'package:deskpilot/editor.dart';
+import 'package:deskpilot/action_picker.dart';
 import 'package:deskpilot/deck_view.dart';
 import 'package:deskpilot/now_playing.dart';
 import 'package:deskpilot/tile_grid.dart';
@@ -164,14 +166,9 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('Add button'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Widget'));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Photos'));
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Photos'));
-      await tester.pumpAndSettle();
+      await pickAction(tester, 'photos', 'Photos');
       await tester.ensureVisible(find.text('Add photo'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Add photo'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save'));
@@ -193,14 +190,11 @@ void main() {
   testWidgets('adds a key combo button in edit mode', (tester) async {
     await tester.pumpWidget(host(editing: true));
 
-    await tester.tap(find.text('Add button'));
-    await tester.pumpAndSettle();
+    await pickAction(tester, 'key', 'Key shortcut');
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Label'),
       'Mute Discord',
     );
-    await tester.tap(find.text('Keys'));
-    await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Key combos'),
       'Ctrl+Shift+M, Alt+Tab',
@@ -227,19 +221,45 @@ void main() {
     );
   });
 
-  testWidgets('an empty label names the button after what it does', (
+  testWidgets('a simple action is added in one tap, named for what it does', (
     tester,
   ) async {
     await tester.pumpWidget(host(editing: true));
 
+    await pickAction(tester, 'cpu load', 'CPU load');
+
+    final added = changed!.pages[0].buttons.last;
+    expect(added.label, 'CPU load');
+    expect((added.action as StatAction).stat, 'cpuLoad');
+    expect(find.byType(ButtonEditor), findsNothing, reason: 'nothing to set');
+  });
+
+  testWidgets('the actions list is searchable', (tester) async {
+    await tester.pumpWidget(host(editing: true));
+
     await tester.tap(find.text('Add button'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Stat'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(ActionPicker),
+        matching: find.byType(TextField),
+      ),
+      'tyre',
+    );
+    await tester.pump();
 
-    expect(changed!.pages[0].buttons.last.label, 'CPU load');
+    final inPicker = find.descendant(
+      of: find.byType(ActionPicker),
+      matching: find.byType(KeyTile),
+    );
+    expect(inPicker, findsWidgets);
+    expect(
+      find.descendant(
+        of: find.byType(ActionPicker),
+        matching: find.text('Next'),
+      ),
+      findsNothing,
+    );
   });
 
   test('buttons name themselves after what they do', () {
@@ -271,9 +291,12 @@ void main() {
 
     await tester.tap(find.text('Play / Pause'));
     await tester.pumpAndSettle();
+    await openTab(tester, 'Look');
     await tester.ensureVisible(find.byTooltip('flag'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('flag'));
     await tester.ensureVisible(find.byTooltip('amber'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('amber'));
     await tester.pump();
     await tester.tap(find.text('Save'));
@@ -320,8 +343,12 @@ void main() {
 
     await tester.tap(find.text('Play / Pause'));
     await tester.pumpAndSettle();
-    for (final choice in ['Wide', 'Solid', 'Icon only']) {
+    await openTab(tester, 'Size');
+    await tester.tap(find.text('Wide'));
+    await openTab(tester, 'Look');
+    for (final choice in ['Solid', 'Icon only']) {
       await tester.ensureVisible(find.text(choice));
+      await tester.pumpAndSettle();
       await tester.tap(find.text(choice));
       await tester.pump();
     }
@@ -358,7 +385,9 @@ void main() {
 
     await tester.tap(find.text('Stretched'));
     await tester.pumpAndSettle();
+    await openTab(tester, 'Size');
     await tester.ensureVisible(find.text('Shape (now a custom 4 × 2)'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Normal'));
     await tester.pump();
     await tester.tap(find.text('Save'));
@@ -377,8 +406,10 @@ void main() {
 
     await tester.tap(find.text('Play / Pause'));
     await tester.pumpAndSettle();
+    await openTab(tester, 'Size');
     final width = find.byType(Slider).first;
     await tester.ensureVisible(width);
+    await tester.pumpAndSettle();
     await tester.drag(width, const Offset(60, 0));
     await tester.pump();
     await tester.tap(find.text('Save'));
@@ -420,6 +451,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Large'));
     await tester.ensureVisible(find.byTooltip('purple').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('purple').last);
     await tester.pump();
     await tester.tap(find.text('Save'));
@@ -494,11 +526,19 @@ void main() {
       await tester.tap(find.text('Add button'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Folder'),
+        find.descendant(
+          of: find.byType(ActionPicker),
+          matching: find.text('Folder'),
+        ),
         findsNothing,
         reason: 'no folder in a folder',
       );
-      await tester.tap(find.text('Save'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(ActionPicker),
+          matching: find.text('Next'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       final folder = changed!.pages[0].buttons.single.action as FolderAction;
@@ -508,12 +548,7 @@ void main() {
     testWidgets('can be made from the editor', (tester) async {
       await tester.pumpWidget(host(editing: true));
 
-      await tester.tap(find.text('Add button'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Folder'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
+      await pickAction(tester, 'folder', 'Folder');
 
       expect(changed!.pages[0].buttons.last.action, isA<FolderAction>());
     });
@@ -543,7 +578,9 @@ void main() {
 
     await tester.tap(find.text('Play / Pause'));
     await tester.pumpAndSettle();
+    await openTab(tester, 'Look');
     await tester.ensureVisible(find.text('Choose picture'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Choose picture'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save'));
@@ -656,20 +693,11 @@ void main() {
     testWidgets('can be added in edit mode', (tester) async {
       await tester.pumpWidget(host(editing: true));
 
-      await tester.tap(find.text('Add button'));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Label'),
-        'CPU',
-      );
-      await tester.tap(find.text('Stat'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
+      await pickAction(tester, 'gpu temp', 'GPU temperature');
 
       final added = changed!.pages[0].buttons.last.action;
       expect(added, isA<StatAction>());
-      expect((added as StatAction).stat, 'cpuLoad');
+      expect((added as StatAction).stat, 'gpuTemp');
       expect(added.style, 'number');
     });
   });
@@ -741,3 +769,27 @@ void main() {
 }
 
 void _ignore(Object? _) {}
+
+/// Opens the actions list, searches it, and picks [name].
+Future<void> pickAction(WidgetTester tester, String search, String name) async {
+  await tester.tap(find.text('Add button'));
+  await tester.pumpAndSettle();
+  await tester.enterText(
+    find.descendant(
+      of: find.byType(ActionPicker),
+      matching: find.byType(TextField),
+    ),
+    search,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.descendant(of: find.byType(ActionPicker), matching: find.text(name)),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Switches the button editor to its [name] tab.
+Future<void> openTab(WidgetTester tester, String name) async {
+  await tester.tap(find.widgetWithText(Tab, name));
+  await tester.pumpAndSettle();
+}

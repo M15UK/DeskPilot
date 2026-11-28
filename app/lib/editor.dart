@@ -39,19 +39,14 @@ final class OpenFolder extends ButtonEdit {
   final String id;
 }
 
-final class MoveButton extends ButtonEdit {
-  const MoveButton(this.id, this.by);
-
-  final String id;
-  final int by;
-}
-
 /// Adds a new button, or changes, moves or deletes [button].
 class ButtonEditor extends StatefulWidget {
   const ButtonEditor({
     super.key,
     this.button,
     this.canBeFolder = true,
+    this.start,
+    this.startCells,
     this.pictures = const {},
     this.pickPicture,
     this.onPicture,
@@ -61,6 +56,11 @@ class ButtonEditor extends StatefulWidget {
 
   /// False inside a folder: folders don't hold folders.
   final bool canBeFolder;
+
+  /// For a new button: the action picked in the [ActionPicker], and the
+  /// size in cells it opens at.
+  final ButtonAction? start;
+  final (int, int)? startCells;
 
   /// Pictures the phone already has, by id.
   final Map<String, Uint8List> pictures;
@@ -76,22 +76,28 @@ class ButtonEditor extends StatefulWidget {
   State<ButtonEditor> createState() => _ButtonEditorState();
 }
 
-class _ButtonEditorState extends State<ButtonEditor> {
+class _ButtonEditorState extends State<ButtonEditor>
+    with SingleTickerProviderStateMixin {
+  late final _tabs = TabController(length: 3, vsync: this);
+
+  /// The action the editor opened with: the button's, or the picked one.
+  ButtonAction? get _initial => widget.button?.action ?? widget.start;
+
   final _form = GlobalKey<FormState>();
   late final _label = TextEditingController(text: widget.button?.label);
   late final _combos = TextEditingController(
-    text: switch (widget.button?.action) {
+    text: switch (_initial) {
       KeysAction(:final combos) => combos.join(', '),
       _ => '',
     },
   );
   late final _target = TextEditingController(
-    text: switch (widget.button?.action) {
+    text: switch (_initial) {
       OpenAction(:final target) => target,
       _ => '',
     },
   );
-  late String _kind = switch (widget.button?.action) {
+  late String _kind = switch (_initial) {
     KeysAction() => 'keys',
     OpenAction() => 'open',
     StatAction() => 'stat',
@@ -102,27 +108,27 @@ class _ButtonEditorState extends State<ButtonEditor> {
     TyresAction() => 'widget',
     _ => 'media',
   };
-  late String _widget = switch (widget.button?.action) {
+  late String _widget = switch (_initial) {
     ClockAction() => 'clock',
     PhotosAction() => 'photos',
     TyresAction() => 'tyres',
     _ => 'music',
   };
-  late List<String> _photos = switch (widget.button?.action) {
+  late List<String> _photos = switch (_initial) {
     PhotosAction(:final pictures) => pictures,
     _ => const [],
   };
   Map<String, Uint8List> _photoBytes = const {};
   String? _photoProblem;
-  late String _stat = switch (widget.button?.action) {
+  late String _stat = switch (_initial) {
     StatAction(:final stat) => stat,
     _ => 'cpuLoad',
   };
-  late String _style = switch (widget.button?.action) {
+  late String _style = switch (_initial) {
     StatAction(:final style) => style,
     _ => 'number',
   };
-  late String _media = switch (widget.button?.action) {
+  late String _media = switch (_initial) {
     MediaAction(:final media) => media,
     _ => 'playPause',
   };
@@ -132,8 +138,8 @@ class _ButtonEditorState extends State<ButtonEditor> {
   // The size in eighths of a cell: a shape chip or the sliders set it, and a
   // size that matches no shape shows as custom.
   late (int, int) _fine = (
-    widget.button?.fine.width ?? eighths,
-    widget.button?.fine.height ?? eighths,
+    widget.button?.fine.width ?? (widget.startCells?.$1 ?? 1) * eighths,
+    widget.button?.fine.height ?? (widget.startCells?.$2 ?? 1) * eighths,
   );
   static const _normal = (eighths, eighths);
 
@@ -179,6 +185,7 @@ class _ButtonEditorState extends State<ButtonEditor> {
 
   @override
   void dispose() {
+    _tabs.dispose();
     _label.dispose();
     _combos.dispose();
     _target.dispose();
@@ -196,7 +203,7 @@ class _ButtonEditorState extends State<ButtonEditor> {
     ),
     'open' => OpenAction(_target.text.trim()),
     'stat' => StatAction(_stat, _style),
-    'folder' => FolderAction(switch (widget.button?.action) {
+    'folder' => FolderAction(switch (_initial) {
       FolderAction(:final buttons) => buttons,
       _ => const [],
     }),
@@ -322,17 +329,31 @@ class _ButtonEditorState extends State<ButtonEditor> {
   }
 
   void _save() {
+    // The keys or what to open live on the Action tab: go there to say what's
+    // missing.
+    final missing = switch (_action()) {
+      KeysAction(:final combos) => combos.isEmpty,
+      OpenAction(:final target) => target.isEmpty,
+      _ => false,
+    };
+    if (missing && _tabs.index != 0) {
+      _tabs.index = 0;
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _form.currentState?.validate(),
+      );
+      return;
+    }
     if (!(_form.currentState?.validate() ?? false)) return;
     final button = _button(widget.button?.id ?? newButtonId());
     Navigator.of(context).pop(SaveButton(button));
   }
 
   /// The button as it will look on the deck, updated as you edit.
-  Widget _preview() {
+  Widget _previewTile() {
     final button = _button('preview');
     return Center(
       child: SizedBox.square(
-        dimension: 120,
+        dimension: 104,
         child: switch (button.action) {
           MusicAction() => const NowPlayingCard(media: null, onKey: null),
           ClockAction() => const ClockTile(pcName: null, stats: {}),
@@ -398,239 +419,302 @@ class _ButtonEditorState extends State<ButtonEditor> {
     ],
   );
 
+  /// One tab's settings, scrolling on their own.
+  Widget _tab(List<Widget> children) => ListView(
+    padding: const EdgeInsets.all(20),
+    children: [
+      for (final (index, child) in children.indexed) ...[
+        if (index > 0) const SizedBox(height: 16),
+        child,
+      ],
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final button = widget.button;
-    return AlertDialog(
-      title: Text(button == null ? 'New button' : 'Edit button'),
-      content: Form(
-        key: _form,
-        child: SingleChildScrollView(
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 680),
+        child: Form(
+          key: _form,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 16,
             children: [
-              _preview(),
-              TextFormField(
-                controller: _label,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: 'Label',
-                  hintText: autoLabel(_action()),
-                  helperText: 'Leave empty to use the name shown',
-                ),
-                maxLength: _maxTextLength,
-              ),
-              // A folder with buttons in it stays a folder, so they can't be
-              // lost by picking another kind by mistake.
-              if (_folderButtons case final count? when count > 0)
-                Text(
-                  'This folder holds $count buttons. Open it to change them, '
-                  'or delete it to remove them all.',
-                )
-              else
-                OptionChips(
-                  title: 'Type',
-                  choices: {
-                    'media': 'Media',
-                    'keys': 'Keys',
-                    'open': 'Open',
-                    'stat': 'Stat',
-                    if (widget.canBeFolder) 'folder': 'Folder',
-                    'widget': 'Widget',
-                  },
-                  selected: _kind,
-                  onSelect: (kind) => setState(() => _kind = kind ?? _kind),
-                ),
-              switch (_kind) {
-                'widget' => Column(
+              // Always in sight: the button as it will look, and its name.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 12,
-                  children: [
-                    OptionChips(
-                      title: 'Widget',
-                      choices: const {
-                        'music': 'Music',
-                        'clock': 'Clock',
-                        'photos': 'Photos',
-                        'tyres': 'Tyres',
-                      },
-                      selected: _widget,
-                      onSelect: (picked) => setState(() {
-                        _widget = picked ?? _widget;
-                        // Music reads best wide; pick another shape any time.
-                        if (_widget == 'music' && _fine == _normal) {
-                          _fine = (3 * eighths, eighths);
-                        }
-                      }),
-                    ),
-                    if (_widget == 'photos')
-                      _photosField()
-                    else
-                      const Text(
-                        'It shows on its own. Drag it where you like and pick '
-                        'its shape below.',
-                      ),
-                  ],
-                ),
-                'folder' => const Text(
-                  'Tap the folder on your deck to open it. To add buttons, '
-                  'open it from here in edit mode.',
-                ),
-                'keys' => TextFormField(
-                  controller: _combos,
-                  onChanged: (_) => setState(() {}),
-                  autocorrect: false,
-                  decoration: const InputDecoration(
-                    labelText: 'Key combos',
-                    helperText:
-                        'Like Ctrl+Shift+M. Separate several with commas.',
-                  ),
-                  validator: (text) =>
-                      _required(text, 'Type at least one key combo'),
-                ),
-                'open' => TextFormField(
-                  controller: _target,
-                  onChanged: (_) => setState(() {}),
-                  autocorrect: false,
-                  decoration: const InputDecoration(
-                    labelText: 'App, file, folder or link',
-                    helperText: r'Like C:\Games\game.exe or https://…',
-                  ),
-                  validator: (text) =>
-                      _required(text, 'Type what the button opens'),
-                ),
-                'stat' => Column(
-                  mainAxisSize: MainAxisSize.min,
                   spacing: 16,
                   children: [
-                    DropdownButtonFormField<String>(
-                      initialValue: _stat,
-                      decoration: const InputDecoration(labelText: 'Reading'),
-                      items: [
-                        for (final MapEntry(:key, :value) in statNames.entries)
-                          DropdownMenuItem(value: key, child: Text(value)),
-                      ],
-                      onChanged: (stat) =>
-                          setState(() => _stat = stat ?? _stat),
-                    ),
-                    DropdownButtonFormField<String>(
-                      initialValue: _style,
-                      decoration: const InputDecoration(
-                        labelText: 'Show it as',
+                    SizedBox.square(dimension: 104, child: _previewTile()),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            button == null ? 'New button' : 'Edit button',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          TextFormField(
+                            controller: _label,
+                            onChanged: (_) => setState(() {}),
+                            decoration: InputDecoration(
+                              labelText: 'Label',
+                              hintText: autoLabel(_action()),
+                              helperText: 'Leave empty to use the name shown',
+                            ),
+                            maxLength: _maxTextLength,
+                          ),
+                        ],
                       ),
-                      items: [
-                        for (final MapEntry(:key, :value) in statStyles.entries)
-                          DropdownMenuItem(value: key, child: Text(value)),
+                    ),
+                  ],
+                ),
+              ),
+              TabBar(
+                controller: _tabs,
+                tabs: const [
+                  Tab(text: 'Action'),
+                  Tab(text: 'Look'),
+                  Tab(text: 'Size'),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabs,
+                  children: [
+                    _tab([
+                      // A folder with buttons in it stays a folder, so they can't be
+                      // lost by picking another kind by mistake.
+                      if (_folderButtons case final count? when count > 0)
+                        Text(
+                          'This folder holds $count buttons. Open it to change them, '
+                          'or delete it to remove them all.',
+                        )
+                      else
+                        OptionChips(
+                          title: 'Type',
+                          choices: {
+                            'media': 'Media',
+                            'keys': 'Keys',
+                            'open': 'Open',
+                            'stat': 'Stat',
+                            if (widget.canBeFolder) 'folder': 'Folder',
+                            'widget': 'Widget',
+                          },
+                          selected: _kind,
+                          onSelect: (kind) =>
+                              setState(() => _kind = kind ?? _kind),
+                        ),
+                      switch (_kind) {
+                        'widget' => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          spacing: 12,
+                          children: [
+                            OptionChips(
+                              title: 'Widget',
+                              choices: const {
+                                'music': 'Music',
+                                'clock': 'Clock',
+                                'photos': 'Photos',
+                                'tyres': 'Tyres',
+                              },
+                              selected: _widget,
+                              onSelect: (picked) => setState(() {
+                                _widget = picked ?? _widget;
+                                // Music reads best wide; pick another shape any time.
+                                if (_widget == 'music' && _fine == _normal) {
+                                  _fine = (3 * eighths, eighths);
+                                }
+                              }),
+                            ),
+                            if (_widget == 'photos')
+                              _photosField()
+                            else
+                              const Text(
+                                'It shows on its own. Drag it where you like and pick '
+                                'its shape below.',
+                              ),
+                          ],
+                        ),
+                        'folder' => const Text(
+                          'Tap the folder on your deck to open it. To add buttons, '
+                          'open it from here in edit mode.',
+                        ),
+                        'keys' => TextFormField(
+                          controller: _combos,
+                          onChanged: (_) => setState(() {}),
+                          autocorrect: false,
+                          decoration: const InputDecoration(
+                            labelText: 'Key combos',
+                            helperText: 'Like Ctrl+Shift+M. Separate several with commas.',
+                          ),
+                          validator: (text) =>
+                              _required(text, 'Type at least one key combo'),
+                        ),
+                        'open' => TextFormField(
+                          controller: _target,
+                          onChanged: (_) => setState(() {}),
+                          autocorrect: false,
+                          decoration: const InputDecoration(
+                            labelText: 'App, file, folder or link',
+                            helperText: r'Like C:\Games\game.exe or https://…',
+                          ),
+                          validator: (text) =>
+                              _required(text, 'Type what the button opens'),
+                        ),
+                        'stat' => Column(
+                          mainAxisSize: MainAxisSize.min,
+                          spacing: 16,
+                          children: [
+                            DropdownButtonFormField<String>(
+                              initialValue: _stat,
+                              decoration: const InputDecoration(
+                                labelText: 'Reading',
+                              ),
+                              items: [
+                                for (final MapEntry(:key, :value)
+                                    in statNames.entries)
+                                  DropdownMenuItem(
+                                    value: key,
+                                    child: Text(value),
+                                  ),
+                              ],
+                              onChanged: (stat) =>
+                                  setState(() => _stat = stat ?? _stat),
+                            ),
+                            DropdownButtonFormField<String>(
+                              initialValue: _style,
+                              decoration: const InputDecoration(
+                                labelText: 'Show it as',
+                              ),
+                              items: [
+                                for (final MapEntry(:key, :value)
+                                    in statStyles.entries)
+                                  DropdownMenuItem(
+                                    value: key,
+                                    child: Text(value),
+                                  ),
+                              ],
+                              onChanged: (style) =>
+                                  setState(() => _style = style ?? _style),
+                            ),
+                          ],
+                        ),
+                        _ => DropdownButtonFormField<String>(
+                          initialValue: _media,
+                          decoration: const InputDecoration(
+                            labelText: 'Media key',
+                          ),
+                          items: [
+                            for (final MapEntry(:key, :value)
+                                in mediaKeys.entries)
+                              DropdownMenuItem(value: key, child: Text(value)),
+                          ],
+                          onChanged: (media) =>
+                              setState(() => _media = media ?? _media),
+                        ),
+                      },
+                    ]),
+                    _tab([
+                      if (_kind == 'stat' || _kind == 'widget')
+                        const Text(
+                          'This one draws itself. Its size is on the Size tab.',
+                        ),
+                      if (_kind != 'stat' && _kind != 'widget') _iconPicker(),
+                      if (_kind != 'widget') _colorPicker(),
+                      if (widget.onPicture case final upload?
+                          when _kind != 'stat' && _kind != 'widget')
+                        PictureField(
+                          noun: 'picture',
+                          wallpaper: false,
+                          picture: _picture,
+                          chosen: _image != null,
+                          pick: widget.pickPicture ?? pickFromGallery,
+                          upload: upload,
+                          onChanged: (id, bytes) => setState(() {
+                            _image = id;
+                            _picked = bytes;
+                          }),
+                        ),
+                      if (_kind != 'stat' && _kind != 'widget') ...[
+                        OptionChips(
+                          title: 'Style',
+                          choices: buttonStyles,
+                          selected: _look,
+                          onSelect: (look) => setState(() => _look = look),
+                        ),
+                        OptionChips(
+                          title: 'Show',
+                          choices: buttonShows,
+                          selected: _show,
+                          onSelect: (show) => setState(() => _show = show),
+                        ),
                       ],
-                      onChanged: (style) =>
-                          setState(() => _style = style ?? _style),
-                    ),
+                    ]),
+                    _tab([
+                      OptionChips(
+                        title: _shape == 'custom'
+                            ? 'Shape (now a custom '
+                                  '${cellCount(_fine.$1)} × ${cellCount(_fine.$2)})'
+                            : 'Shape',
+                        choices: buttonSizes,
+                        selected: _shape,
+                        onSelect: (shape) => setState(
+                          () => _fine = switch (shapeSpans[shape]) {
+                            (final wide, final tall)? => (
+                              wide * eighths,
+                              tall * eighths,
+                            ),
+                            null => _normal,
+                          },
+                        ),
+                      ),
+                      _sizeSlider(
+                        'Width',
+                        _fine.$1,
+                        (width) => setState(() => _fine = (width, _fine.$2)),
+                      ),
+                      _sizeSlider(
+                        'Height',
+                        _fine.$2,
+                        (height) => setState(() => _fine = (_fine.$1, height)),
+                      ),
+                    ]),
                   ],
                 ),
-                _ => DropdownButtonFormField<String>(
-                  initialValue: _media,
-                  decoration: const InputDecoration(labelText: 'Media key'),
-                  items: [
-                    for (final MapEntry(:key, :value) in mediaKeys.entries)
-                      DropdownMenuItem(value: key, child: Text(value)),
-                  ],
-                  onChanged: (media) =>
-                      setState(() => _media = media ?? _media),
-                ),
-              },
-              if (_kind != 'stat' && _kind != 'widget') _iconPicker(),
-              if (_kind != 'widget') _colorPicker(),
-              if (widget.onPicture case final upload?
-                  when _kind != 'stat' && _kind != 'widget')
-                PictureField(
-                  noun: 'picture',
-                  wallpaper: false,
-                  picture: _picture,
-                  chosen: _image != null,
-                  pick: widget.pickPicture ?? pickFromGallery,
-                  upload: upload,
-                  onChanged: (id, bytes) => setState(() {
-                    _image = id;
-                    _picked = bytes;
-                  }),
-                ),
-              OptionChips(
-                title: _shape == 'custom'
-                    ? 'Shape (now a custom '
-                          '${cellCount(_fine.$1)} × ${cellCount(_fine.$2)})'
-                    : 'Shape',
-                choices: buttonSizes,
-                selected: _shape,
-                onSelect: (shape) => setState(
-                  () => _fine = switch (shapeSpans[shape]) {
-                    (final wide, final tall)? => (
-                      wide * eighths,
-                      tall * eighths,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                child: Row(
+                  children: [
+                    if (button != null)
+                      TextButton(
+                        onPressed: () =>
+                            Navigator.of(context).pop(DeleteButton(button.id)),
+                        child: const Text('Delete'),
+                      ),
+                    if (button != null && button.action is FolderAction)
+                      TextButton(
+                        onPressed: () =>
+                            Navigator.of(context).pop(OpenFolder(button.id)),
+                        child: const Text('Open folder'),
+                      ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
                     ),
-                    null => _normal,
-                  },
+                    const SizedBox(width: 8),
+                    FilledButton(onPressed: _save, child: const Text('Save')),
+                  ],
                 ),
               ),
-              _sizeSlider(
-                'Width',
-                _fine.$1,
-                (width) => setState(() => _fine = (width, _fine.$2)),
-              ),
-              _sizeSlider(
-                'Height',
-                _fine.$2,
-                (height) => setState(() => _fine = (_fine.$1, height)),
-              ),
-              if (_kind != 'stat' && _kind != 'widget') ...[
-                OptionChips(
-                  title: 'Style',
-                  choices: buttonStyles,
-                  selected: _look,
-                  onSelect: (look) => setState(() => _look = look),
-                ),
-                OptionChips(
-                  title: 'Show',
-                  choices: buttonShows,
-                  selected: _show,
-                  onSelect: (show) => setState(() => _show = show),
-                ),
-              ],
             ],
           ),
         ),
       ),
-      actions: [
-        if (button != null && button.action is FolderAction)
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(OpenFolder(button.id)),
-            child: const Text('Open folder'),
-          ),
-        if (button != null) ...[
-          IconButton(
-            tooltip: 'Move left',
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () =>
-                Navigator.of(context).pop(MoveButton(button.id, -1)),
-          ),
-          IconButton(
-            tooltip: 'Move right',
-            icon: const Icon(Icons.arrow_forward),
-            onPressed: () =>
-                Navigator.of(context).pop(MoveButton(button.id, 1)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(DeleteButton(button.id)),
-            child: const Text('Delete'),
-          ),
-        ],
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(onPressed: _save, child: const Text('Save')),
-      ],
     );
   }
 }
